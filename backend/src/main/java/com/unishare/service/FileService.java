@@ -72,18 +72,22 @@ public class FileService {
         // Save each parsed file
         for (UploadedFile uploadedFile : parsedFiles) {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String filename = uploadedFile.filename;
+            String originalFilename = uploadedFile.filename;
             
-            // Add timestamp to filename if not already present
-            if (!filename.contains(timestamp)) {
-                int lastDot = filename.lastIndexOf('.');
-                if (lastDot > 0) {
-                    String nameWithoutExt = filename.substring(0, lastDot);
-                    String extension = filename.substring(lastDot);
-                    filename = nameWithoutExt + "_" + timestamp + extension;
-                } else {
-                    filename = filename + "_" + timestamp;
-                }
+            // Clean uploader name (replace spaces and special characters with underscores)
+            String cleanUploaderName = uploaderName.replaceAll("[^a-zA-Z0-9]", "_")
+                                                  .replaceAll("_+", "_")
+                                                  .replaceAll("^_|_$", "");
+            
+            // Create new filename: {module}_{uploaderName}_{originalFilename}
+            String filename;
+            int lastDot = originalFilename.lastIndexOf('.');
+            if (lastDot > 0) {
+                String nameWithoutExt = originalFilename.substring(0, lastDot);
+                String extension = originalFilename.substring(lastDot);
+                filename = module + "_" + cleanUploaderName + "_" + nameWithoutExt + "_" + timestamp + extension;
+            } else {
+                filename = module + "_" + cleanUploaderName + "_" + originalFilename + "_" + timestamp;
             }
             
             Path filePath = modulePath.resolve(filename);
