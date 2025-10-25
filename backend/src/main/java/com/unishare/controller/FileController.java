@@ -55,8 +55,20 @@ public class FileController implements HttpHandler {
         System.out.println("📤 File upload request received");
         
         try {
+            // Read the request body once
+            InputStream inputStream = exchange.getRequestBody();
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            
+            byte[] data = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(data)) != -1) {
+                buffer.write(data, 0, bytesRead);
+            }
+            
+            byte[] requestBody = buffer.toByteArray();
+            
             // Parse multipart form data
-            Map<String, String> formData = parseMultipartFormData(exchange);
+            Map<String, String> formData = parseMultipartFormData(requestBody);
             
             String module = formData.get("module");
             String uploaderName = formData.get("uploaderName");
@@ -70,7 +82,7 @@ public class FileController implements HttpHandler {
             }
             
             // Get uploaded files
-            List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderName);
+            List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderName, requestBody);
             
             // Send success response
             String response = String.format(
@@ -96,38 +108,75 @@ public class FileController implements HttpHandler {
     }
     
     
-    private Map<String, String> parseMultipartFormData(HttpExchange exchange) throws IOException {
+    private Map<String, String> parseMultipartFormData(byte[] requestBody) throws IOException {
         Map<String, String> formData = new HashMap<>();
         
-        // For now, let's extract from headers or use defaults
-        // In a real implementation, you'd parse the multipart body properly
+        String body = new String(requestBody, "UTF-8");
         
-        // Try to get from query parameters first
-        String query = exchange.getRequestURI().getQuery();
-        if (query != null) {
-            String[] pairs = query.split("&");
-            for (String pair : pairs) {
-                String[] keyValue = pair.split("=");
-                if (keyValue.length == 2) {
-                    try {
-                        formData.put(URLDecoder.decode(keyValue[0], "UTF-8"),
-                                    URLDecoder.decode(keyValue[1], "UTF-8"));
-                    } catch (UnsupportedEncodingException e) {
-                        // Handle error
-                    }
+        System.out.println("📝 Raw request body length: " + requestBody.length + " bytes");
+        System.out.println("📝 First 200 chars of body: " + body.substring(0, Math.min(200, body.length())));
+        
+        // Find the boundary dynamically
+        String boundary = null;
+        String[] lines = body.split("\r\n");
+        for (String line : lines) {
+            if (line.startsWith("------WebKitFormBoundary")) {
+                boundary = line;
+                break;
+            }
+        }
+        
+        if (boundary == null) {
+            System.err.println("❌ No boundary found in multipart data");
+            formData.put("module", "IN3111");
+            formData.put("uploaderName", "Anonymous");
+            return formData;
+        }
+        
+        System.out.println("📝 Found boundary: " + boundary);
+        
+        // Split by boundary
+        String[] parts = body.split(boundary);
+        
+        for (String part : parts) {
+            System.out.println("📝 Processing part: " + part.substring(0, Math.min(100, part.length())) + "...");
+            
+            if (part.contains("name=\"module\"")) {
+                // Extract module value
+                int startIndex = part.indexOf("\r\n\r\n") + 4;
+                int endIndex = part.indexOf("\r\n", startIndex);
+                if (endIndex == -1) endIndex = part.length();
+                if (startIndex < endIndex) {
+                    String module = part.substring(startIndex, endIndex).trim();
+                    formData.put("module", module);
+                    System.out.println("📝 Found module: " + module);
+                }
+            }
+            
+            if (part.contains("name=\"uploaderName\"")) {
+                // Extract uploaderName value
+                int startIndex = part.indexOf("\r\n\r\n") + 4;
+                int endIndex = part.indexOf("\r\n", startIndex);
+                if (endIndex == -1) endIndex = part.length();
+                if (startIndex < endIndex) {
+                    String uploaderName = part.substring(startIndex, endIndex).trim();
+                    formData.put("uploaderName", uploaderName);
+                    System.out.println("📝 Found uploaderName: " + uploaderName);
                 }
             }
         }
         
-        // For demonstration, let's add some default values if not provided
+        // Fallback to defaults if not found
         if (!formData.containsKey("module")) {
-            formData.put("module", "IN3111"); // Default module
+            formData.put("module", "IN3111");
+            System.out.println("⚠️ Module not found, using default: IN3111");
         }
         if (!formData.containsKey("uploaderName")) {
-            formData.put("uploaderName", "Anonymous"); // Default uploader
+            formData.put("uploaderName", "Anonymous");
+            System.out.println("⚠️ UploaderName not found, using default: Anonymous");
         }
         
-        System.out.println("📝 Parsed form data: " + formData);
+        System.out.println("📝 Final parsed form data: " + formData);
         return formData;
     }
     

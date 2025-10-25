@@ -33,7 +33,7 @@ Thumbs.db
 .env.production.local
 
 # Uploads (optional - remove this line if you want to include uploaded files)
-uploads/
+# uploads/
 
 # Temporary files
 *.tmp

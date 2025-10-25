@@ -1,6 +1,5 @@
 package com.unishare;
 
-import com.unishare.config.ServerConfig;
 import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
 import com.unishare.service.FileService;
@@ -15,8 +14,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
 
 /**
- * UniShare Backend Server
- * Core Java HTTP server for file sharing and communication
+ * Main server class for UniShare application
  */
 public class UniShareServer {
     
@@ -24,75 +22,56 @@ public class UniShareServer {
     private HttpServer server;
     
     public static void main(String[] args) {
-        System.out.println("🚀 Starting UniShare Backend Server...");
-        
         try {
             UniShareServer app = new UniShareServer();
-            app.startServer();
-            
-            System.out.println("✅ UniShare Server started successfully!");
-            System.out.println("🌐 Server running on: http://localhost:" + PORT);
-            System.out.println("📁 File uploads will be saved to: ./uploads/");
-            System.out.println("💬 WebSocket chat available on: ws://localhost:" + PORT + "/chat");
-            System.out.println("\nPress Ctrl+C to stop the server");
-            
-            // Keep server running
-            Thread.currentThread().join();
-            
+            app.start();
         } catch (Exception e) {
-            System.err.println("❌ Failed to start server: " + e.getMessage());
+            System.err.println("Failed to start server: " + e.getMessage());
             e.printStackTrace();
         }
     }
     
-    public void startServer() throws IOException {
+    public void start() throws IOException {
+        System.out.println("🚀 Starting UniShare Server...");
+        
         // Create HTTP server
         server = HttpServer.create(new InetSocketAddress(PORT), 0);
         
-        // Initialize services
+        // Create services
         FileService fileService = new FileService();
         ModuleService moduleService = new ModuleService();
         
-        // Initialize controllers
+        // Create controllers
         FileController fileController = new FileController(fileService);
         ModuleController moduleController = new ModuleController(moduleService);
         
         // Register routes
-        registerRoutes(fileController, moduleController);
+        server.createContext("/api/upload", fileController);
+        server.createContext("/api/modules", moduleController);
         
-        // Set executor for handling requests
+        // Set thread pool
         server.setExecutor(Executors.newFixedThreadPool(10));
         
         // Start server
         server.start();
+        
+        System.out.println("✅ UniShare Server started successfully!");
+        System.out.println("🌐 Server running on: http://localhost:" + PORT);
+        System.out.println("📁 Upload endpoint: http://localhost:" + PORT + "/api/upload");
+        System.out.println("📋 Modules endpoint: http://localhost:" + PORT + "/api/modules");
+        System.out.println("⏹️  Press Ctrl+C to stop the server");
+        
+        // Keep server running
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\n🛑 Shutting down UniShare Server...");
+            server.stop(0);
+            System.out.println("✅ Server stopped successfully!");
+        }));
     }
     
-    private void registerRoutes(FileController fileController, 
-                              ModuleController moduleController) {
-        
-        // File upload routes
-        server.createContext("/api/upload", fileController::handleUpload);
-        
-        // Module management routes
-        server.createContext("/api/modules", moduleController::handleModules);
-        
-        // Health check
-        server.createContext("/api/health", this::handleHealthCheck);
-    }
-    
-    private void handleHealthCheck(HttpExchange exchange) throws IOException {
-        String response = "{\"status\":\"ok\",\"message\":\"UniShare Backend is running\"}";
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.sendResponseHeaders(200, response.getBytes().length);
-        exchange.getResponseBody().write(response.getBytes());
-        exchange.close();
-    }
-    
-    public void stopServer() {
+    public void stop() {
         if (server != null) {
             server.stop(0);
-            System.out.println("🛑 Server stopped");
         }
     }
 }

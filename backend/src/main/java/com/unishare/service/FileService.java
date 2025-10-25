@@ -49,7 +49,7 @@ public class FileService {
         }
     }
     
-    public List<FileInfo> saveUploadedFiles(HttpExchange exchange, String module, String uploaderName) 
+    public List<FileInfo> saveUploadedFiles(HttpExchange exchange, String module, String uploaderName, byte[] requestBody) 
             throws IOException {
         
         List<FileInfo> uploadedFiles = new ArrayList<>();
@@ -58,62 +58,54 @@ public class FileService {
         Path modulePath = Paths.get(UPLOAD_DIR, module);
         Files.createDirectories(modulePath);
         
-        // Read the request body
-        InputStream inputStream = exchange.getRequestBody();
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        
-        byte[] data = new byte[1024];
-        int bytesRead;
-        while ((bytesRead = inputStream.read(data)) != -1) {
-            buffer.write(data, 0, bytesRead);
-        }
-        
-        byte[] bodyBytes = buffer.toByteArray();
-        
         System.out.println("📤 Received upload request for module: " + module + " by: " + uploaderName);
-        System.out.println("📊 Request body size: " + bodyBytes.length + " bytes");
+        System.out.println("📊 Request body size: " + requestBody.length + " bytes");
         
-        // For now, let's save the raw request data to see what we're getting
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String filename = "raw_upload_" + timestamp + ".bin";
-        Path filePath = modulePath.resolve(filename);
+        // Parse multipart data to extract actual files
+        List<UploadedFile> parsedFiles = parseMultipartData(requestBody);
         
-        // Save the raw request data
-        try (FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
-            fos.write(bodyBytes);
+        if (parsedFiles.isEmpty()) {
+            System.err.println("❌ No files could be parsed from multipart data");
+            return uploadedFiles;
         }
         
-        // Also create a text file with the first 1000 characters for debugging
-        String bodyText = new String(bodyBytes, "UTF-8");
-        String debugFilename = "debug_upload_" + timestamp + ".txt";
-        Path debugPath = modulePath.resolve(debugFilename);
-        
-        try (FileWriter writer = new FileWriter(debugPath.toFile())) {
-            writer.write("=== Upload Debug Info ===\n");
-            writer.write("Module: " + module + "\n");
-            writer.write("Uploader: " + uploaderName + "\n");
-            writer.write("Request size: " + bodyBytes.length + " bytes\n");
-            writer.write("Timestamp: " + timestamp + "\n\n");
-            writer.write("=== First 1000 characters of request ===\n");
-            writer.write(bodyText.substring(0, Math.min(1000, bodyText.length())));
-            if (bodyText.length() > 1000) {
-                writer.write("\n... (truncated)");
+        // Save each parsed file
+        for (UploadedFile uploadedFile : parsedFiles) {
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = uploadedFile.filename;
+            
+            // Add timestamp to filename if not already present
+            if (!filename.contains(timestamp)) {
+                int lastDot = filename.lastIndexOf('.');
+                if (lastDot > 0) {
+                    String nameWithoutExt = filename.substring(0, lastDot);
+                    String extension = filename.substring(lastDot);
+                    filename = nameWithoutExt + "_" + timestamp + extension;
+                } else {
+                    filename = filename + "_" + timestamp;
+                }
             }
+            
+            Path filePath = modulePath.resolve(filename);
+            
+            // Save the actual file content
+            try (FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
+                fos.write(uploadedFile.content);
+            }
+            
+            // Create FileInfo object
+            FileInfo fileInfo = new FileInfo();
+            fileInfo.setFilename(filename);
+            fileInfo.setModule(module);
+            fileInfo.setUploaderName(uploaderName);
+            fileInfo.setUploadDate(LocalDateTime.now());
+            fileInfo.setFileSize(uploadedFile.content.length);
+            fileInfo.setFilePath(filePath.toString());
+            
+            uploadedFiles.add(fileInfo);
+            
+            System.out.println("✅ File saved successfully: " + filename + " (" + uploadedFile.content.length + " bytes) in module " + module);
         }
-        
-        // Create FileInfo object
-        FileInfo fileInfo = new FileInfo();
-        fileInfo.setFilename(filename);
-        fileInfo.setModule(module);
-        fileInfo.setUploaderName(uploaderName);
-        fileInfo.setUploadDate(LocalDateTime.now());
-        fileInfo.setFileSize(bodyBytes.length);
-        fileInfo.setFilePath(filePath.toString());
-        
-        uploadedFiles.add(fileInfo);
-        
-        System.out.println("💾 Raw upload data saved: " + filename + " (" + bodyBytes.length + " bytes) in module " + module);
-        System.out.println("🔍 Debug file created: " + debugFilename);
         
         return uploadedFiles;
     }
@@ -133,7 +125,7 @@ public class FileService {
     private List<UploadedFile> parseMultipartData(byte[] data) throws IOException {
         List<UploadedFile> files = new ArrayList<>();
         
-        // Convert to string to find boundaries
+        // Convert to string to find boundaries and filename
         String body = new String(data, "UTF-8");
         
         // Find the boundary
@@ -162,23 +154,11 @@ public class FileService {
                 String originalFilename = body.substring(start, end);
                 System.out.println("📁 Found original filename: " + originalFilename);
                 
-                // Extract the actual file content using a different approach
-                byte[] fileContent = extractRealFileContent(data, body, boundary);
+                // Extract the actual file content
+                byte[] fileContent = extractFileContentFromMultipart(data, body, boundary);
                 if (fileContent != null && fileContent.length > 0) {
-                    // Use original filename with timestamp
-                    String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-                    String extension = "";
-                    String nameWithoutExt = originalFilename;
-                    
-                    int lastDot = originalFilename.lastIndexOf('.');
-                    if (lastDot > 0) {
-                        extension = originalFilename.substring(lastDot);
-                        nameWithoutExt = originalFilename.substring(0, lastDot);
-                    }
-                    
-                    String newFilename = nameWithoutExt + "_" + timestamp + extension;
-                    files.add(new UploadedFile(newFilename, fileContent));
-                    System.out.println("💾 Saved real file: " + newFilename + " (" + fileContent.length + " bytes)");
+                    files.add(new UploadedFile(originalFilename, fileContent));
+                    System.out.println("💾 Extracted file: " + originalFilename + " (" + fileContent.length + " bytes)");
                 } else {
                     System.out.println("❌ Could not extract file content");
                 }
@@ -188,51 +168,73 @@ public class FileService {
         return files;
     }
     
-    private byte[] extractRealFileContent(byte[] data, String body, String boundary) {
+    private byte[] extractFileContentFromMultipart(byte[] data, String body, String boundary) {
         try {
-            // Find the position where file content starts
-            int contentStartMarker = body.indexOf("\r\n\r\n");
-            if (contentStartMarker == -1) {
-                System.err.println("❌ Could not find content start marker");
+            // Find the file section in the multipart data
+            String fileSectionStart = "Content-Type: application/pdf\r\n\r\n";
+            int fileStartIndex = body.indexOf(fileSectionStart);
+            
+            if (fileStartIndex == -1) {
+                // Try other content types
+                String[] contentTypes = {
+                    "Content-Type: application/pdf\r\n\r\n",
+                    "Content-Type: application/msword\r\n\r\n", 
+                    "Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n",
+                    "Content-Type: text/plain\r\n\r\n",
+                    "Content-Type: image/png\r\n\r\n",
+                    "Content-Type: image/jpeg\r\n\r\n"
+                };
+                
+                for (String contentType : contentTypes) {
+                    fileStartIndex = body.indexOf(contentType);
+                    if (fileStartIndex != -1) {
+                        fileSectionStart = contentType;
+                        break;
+                    }
+                }
+            }
+            
+            if (fileStartIndex == -1) {
+                System.err.println("❌ Could not find file content start");
                 return null;
             }
             
-            // Find the position where content ends (next boundary)
-            int contentEndMarker = body.indexOf("\r\n" + boundary, contentStartMarker);
-            if (contentEndMarker == -1) {
-                contentEndMarker = body.length();
+            // Calculate byte position for content start
+            int contentStartBytePos = body.substring(0, fileStartIndex + fileSectionStart.length()).getBytes("UTF-8").length;
+            
+            // Find the end of the file content (next boundary)
+            int contentEndIndex = body.indexOf("\r\n" + boundary, fileStartIndex);
+            if (contentEndIndex == -1) {
+                contentEndIndex = body.length();
             }
             
-            // Convert string positions to byte positions more carefully
-            String beforeStart = body.substring(0, contentStartMarker + 4); // +4 for \r\n\r\n
-            String beforeEnd = body.substring(0, contentEndMarker);
-            
-            int byteStart = beforeStart.getBytes("UTF-8").length;
-            int byteEnd = beforeEnd.getBytes("UTF-8").length;
+            // Calculate byte position for content end
+            int contentEndBytePos = body.substring(0, contentEndIndex).getBytes("UTF-8").length;
             
             // Ensure we don't exceed data bounds
-            if (byteStart >= data.length) {
-                System.err.println("❌ Byte start position exceeds data length");
+            if (contentStartBytePos >= data.length) {
+                System.err.println("❌ Content start position exceeds data length");
                 return null;
             }
             
-            if (byteEnd > data.length) {
-                byteEnd = data.length;
+            if (contentEndBytePos > data.length) {
+                contentEndBytePos = data.length;
             }
             
-            int contentLength = byteEnd - byteStart;
+            int contentLength = contentEndBytePos - contentStartBytePos;
             if (contentLength <= 0) {
                 System.err.println("❌ No content to extract");
                 return null;
             }
             
             byte[] content = new byte[contentLength];
-            System.arraycopy(data, byteStart, content, 0, contentLength);
+            System.arraycopy(data, contentStartBytePos, content, 0, contentLength);
             
+            System.out.println("📊 Extracted " + contentLength + " bytes of file content");
             return content;
             
         } catch (Exception e) {
-            System.err.println("❌ Error extracting real file content: " + e.getMessage());
+            System.err.println("❌ Error extracting file content: " + e.getMessage());
             return null;
         }
     }
