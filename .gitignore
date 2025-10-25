@@ -35,6 +35,9 @@ Thumbs.db
 # Uploads (optional - remove this line if you want to include uploaded files)
 # uploads/
 
+# Documentation (local only)
+ADDING_MODULES.md
+
 # Temporary files
 *.tmp
 *.temp
