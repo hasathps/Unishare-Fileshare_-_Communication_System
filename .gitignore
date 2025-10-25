@@ -35,6 +35,16 @@ Thumbs.db
 # Uploads (optional - remove this line if you want to include uploaded files)
 # uploads/
 
+# Uploaded files (keep locally, exclude from git)
+backend/uploads/**/*.pdf
+backend/uploads/**/*.png
+backend/uploads/**/*.jpg
+backend/uploads/**/*.jpeg
+backend/uploads/**/*.gif
+backend/uploads/**/*.doc
+backend/uploads/**/*.docx
+backend/uploads/**/*.txt
+
 # Documentation (local only)
 ADDING_MODULES.md
 
