@@ -1,0 +1,13 @@
+@echo off
+echo 🚀 Starting UniShare System...
+
+echo 📦 Building project...
+call build.bat
+
+echo 💬 Starting Chat Server...
+start "Chat Server" cmd /k "java -cp build\classes com.unishare.ChatServer"
+
+timeout /t 2 /nobreak > nul
+
+echo 🌐 Starting Main Server...
+java -cp build\classes com.unishare.UniShareServer

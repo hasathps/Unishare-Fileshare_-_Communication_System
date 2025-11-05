@@ -5,7 +5,7 @@ package com.unishare.config;
  */
 public class ServerConfig {
     
-    public static final int PORT = 8080;
+    public static final int PORT = 8082;
     public static final String UPLOAD_DIR = "uploads";
     public static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     public static final int MAX_CONCURRENT_UPLOADS = 5;

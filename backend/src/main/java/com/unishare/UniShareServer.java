@@ -2,8 +2,10 @@ package com.unishare;
 
 import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
+import com.unishare.controller.WebSocketChatController;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
+import com.unishare.service.ChatService;
 import com.unishare.util.CORSFilter;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
@@ -18,7 +20,7 @@ import java.util.concurrent.Executors;
  */
 public class UniShareServer {
     
-    private static final int PORT = 8080;
+    private static final int PORT = 8082;
     private HttpServer server;
     
     public static void main(String[] args) {
@@ -40,14 +42,17 @@ public class UniShareServer {
         // Create services
         FileService fileService = new FileService();
         ModuleService moduleService = new ModuleService();
+
         
         // Create controllers
         FileController fileController = new FileController(fileService);
         ModuleController moduleController = new ModuleController(moduleService);
+        WebSocketChatController chatController = new WebSocketChatController();
         
         // Register routes
         server.createContext("/api/upload", fileController);
         server.createContext("/api/modules", moduleController);
+        server.createContext("/api/chat", chatController);
         
         // Set thread pool
         server.setExecutor(Executors.newFixedThreadPool(10));
@@ -59,6 +64,7 @@ public class UniShareServer {
         System.out.println("🌐 Server running on: http://localhost:" + PORT);
         System.out.println("📁 Upload endpoint: http://localhost:" + PORT + "/api/upload");
         System.out.println("📋 Modules endpoint: http://localhost:" + PORT + "/api/modules");
+        System.out.println("💬 Chat endpoint: http://localhost:" + PORT + "/api/chat");
         System.out.println("⏹️  Press Ctrl+C to stop the server");
         
         // Keep server running

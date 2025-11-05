@@ -60,7 +60,7 @@ const FileUploader = () => {
       })
 
       // Upload to backend
-      const response = await axios.post('http://localhost:8080/api/upload', formData, {
+      const response = await axios.post('http://localhost:8082/api/upload', formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
           'Accept': 'application/json'
