@@ -13,6 +13,7 @@ set DRIVER_JAR=lib\postgresql-42.7.3.jar
 set BUILD_DIR=build\classes
 set SECRET_FILE=config\neon-db-url.txt
 set DEFAULT_DB_URL=postgresql://neondb_owner:npg_ZThxUb3LnBj2@ep-still-recipe-a1efuwr6-pooler.ap-southeast-1.aws.neon.tech/Unishare?sslmode=require^&channel_binding=require
+set DEFAULT_CLOUDINARY_URL=cloudinary://231691278861595:rob-oOdof4FVn2_S0arogULrAVw@dftaxsgz8
 
 if not exist "config" (
     mkdir "config" >nul 2>&1
@@ -42,6 +43,10 @@ if "%NEON_DB_URL%"=="" (
 REM Fallback to default connection string baked into this script (contains credentials)
 if "%NEON_DB_URL%"=="" (
     set "NEON_DB_URL=%DEFAULT_DB_URL%"
+)
+
+if "%CLOUDINARY_URL%"=="" (
+    set "CLOUDINARY_URL=%DEFAULT_CLOUDINARY_URL%"
 )
 
 REM Check for NEON_DB_URL env var

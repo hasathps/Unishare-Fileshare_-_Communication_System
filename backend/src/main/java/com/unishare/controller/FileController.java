@@ -80,28 +80,33 @@ public class FileController implements HttpHandler {
             Map<String, String> formData = parseMultipartFormData(requestBody);
             
             String module = formData.get("module");
-            String uploaderName = formData.get("uploaderName");
-            if (uploaderName == null || uploaderName.isBlank()) {
-                uploaderName = user.get().getDisplayName() != null && !user.get().getDisplayName().isBlank()
+            String uploaderLabel = formData.get("uploaderName");
+            String uploaderEmail = user.get().getEmail();
+            if (uploaderLabel == null || uploaderLabel.isBlank()) {
+                uploaderLabel = user.get().getDisplayName() != null && !user.get().getDisplayName().isBlank()
                         ? user.get().getDisplayName()
-                        : user.get().getEmail();
+                        : uploaderEmail;
             }
             
-            System.out.println("📝 Parsed form data: module=" + module + ", uploaderName=" + uploaderName);
+            System.out.println("📝 Parsed form data: module=" + module + ", uploaderName=" + uploaderLabel);
             
-            if (module == null || uploaderName == null) {
+            if (module == null) {
                 System.err.println("❌ Missing module or uploader name");
                 sendErrorResponse(exchange, 400, "Missing module or uploader name");
                 return;
             }
             
             // Get uploaded files
-            List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderName, requestBody);
+            List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderEmail, requestBody);
             
             // Send success response
+            String filesJson = uploadedFiles.stream()
+                    .map(FileInfo::toJson)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
             String response = String.format(
-                "{\"success\":true,\"message\":\"Files uploaded successfully\",\"files\":%d,\"module\":\"%s\"}",
-                uploadedFiles.size(), module
+                "{\"success\":true,\"message\":\"Files uploaded successfully\",\"module\":\"%s\",\"files\":[%s]}",
+                module, filesJson
             );
             
             System.out.println("📤 Sending response: " + response);

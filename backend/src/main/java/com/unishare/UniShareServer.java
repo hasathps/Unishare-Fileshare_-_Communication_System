@@ -5,6 +5,7 @@ import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
 import com.unishare.service.AuthService;
 import com.unishare.service.DatabaseService;
+import com.unishare.service.FileMetadataService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
 import com.unishare.service.SchemaInitializer;
@@ -51,7 +52,8 @@ public class UniShareServer {
         }
 
         // Create services
-        FileService fileService = new FileService();
+        FileMetadataService fileMetadataService = new FileMetadataService(databaseService);
+        FileService fileService = new FileService(fileMetadataService);
         ModuleService moduleService = new ModuleService();
         AuthService authService = new AuthService(databaseService);
 
