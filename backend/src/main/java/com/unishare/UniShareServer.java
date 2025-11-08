@@ -2,14 +2,12 @@ package com.unishare;
 
 import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
+import com.unishare.service.DatabaseService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
-import com.unishare.util.CORSFilter;
 import com.sun.net.httpserver.HttpServer;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
-
 import java.io.IOException;
+import java.sql.SQLException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
 
@@ -37,6 +35,16 @@ public class UniShareServer {
         // Create HTTP server
         server = HttpServer.create(new InetSocketAddress(PORT), 0);
         
+        // Initialize database connection
+        DatabaseService databaseService = DatabaseService.getInstance();
+        try {
+            long latency = databaseService.verifyConnection();
+            System.out.println("🗄️  Connected to Neon database (latency: " + latency + " ms)");
+        } catch (SQLException e) {
+            System.err.println("❌ Unable to connect to Neon database: " + e.getMessage());
+            throw new IOException("Database connection failed", e);
+        }
+
         // Create services
         FileService fileService = new FileService();
         ModuleService moduleService = new ModuleService();
