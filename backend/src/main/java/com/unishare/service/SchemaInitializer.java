@@ -48,6 +48,16 @@ public final class SchemaInitializer {
                     // existing null values prevent constraint; leave as-is
                 }
                 try {
+                    alter.execute("ALTER TABLE users ALTER COLUMN username DROP NOT NULL");
+                } catch (SQLException ignored) {
+                    // username column may not exist; ignore
+                }
+                try {
+                    alter.execute("UPDATE users SET username = email WHERE username IS NULL");
+                } catch (SQLException ignored) {
+                    // username column may not exist; ignore
+                }
+                try {
                     alter.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (email)");
                 } catch (SQLException ignored) {
                     // index may already exist with different name

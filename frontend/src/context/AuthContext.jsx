@@ -6,6 +6,7 @@ const AuthContext = createContext({
   user: null,
   loading: true,
   login: async () => {},
+  register: async () => {},
   logout: async () => {},
 });
 
@@ -44,6 +45,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async ({ email, password, displayName }) => {
+    try {
+      await api.post('/api/auth/register', { email, password, displayName });
+      toast.success('Account created! Signing you in…');
+      await login(email, password);
+    } catch (error) {
+      const message =
+        error.response?.data?.error ||
+        error.message ||
+        'Unable to sign up. Please try again.';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/api/auth/logout');
@@ -55,7 +71,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const value = { user, loading, login, logout, apiBaseUrl: API_BASE_URL };
+  const value = { user, loading, login, register, logout, apiBaseUrl: API_BASE_URL };
 
   return (
     <AuthContext.Provider value={value}>

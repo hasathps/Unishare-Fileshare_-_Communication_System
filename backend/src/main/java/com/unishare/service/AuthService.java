@@ -67,6 +67,14 @@ public class AuthService {
             statement.setString(4, displayName);
             statement.setTimestamp(5, Timestamp.from(Instant.now()));
             statement.executeUpdate();
+            try (PreparedStatement usernameUpdate = connection.prepareStatement(
+                    "UPDATE users SET username = ? WHERE id = ?")) {
+                usernameUpdate.setString(1, normalizedEmail);
+                usernameUpdate.setObject(2, userId);
+                usernameUpdate.executeUpdate();
+            } catch (SQLException ignored) {
+                // username column is legacy; ignore if it doesn't exist
+            }
         }
 
         return new User(userId, normalizedEmail, displayName, passwordHash, Instant.now());
