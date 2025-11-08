@@ -1,10 +1,13 @@
 package com.unishare;
 
+import com.unishare.controller.AuthController;
 import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
+import com.unishare.service.AuthService;
 import com.unishare.service.DatabaseService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
+import com.unishare.service.SchemaInitializer;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -40,6 +43,8 @@ public class UniShareServer {
         try {
             long latency = databaseService.verifyConnection();
             System.out.println("🗄️  Connected to Neon database (latency: " + latency + " ms)");
+            SchemaInitializer.initialize(databaseService);
+            System.out.println("🛠️  Database schema verified.");
         } catch (SQLException e) {
             System.err.println("❌ Unable to connect to Neon database: " + e.getMessage());
             throw new IOException("Database connection failed", e);
@@ -48,14 +53,20 @@ public class UniShareServer {
         // Create services
         FileService fileService = new FileService();
         ModuleService moduleService = new ModuleService();
-        
+        AuthService authService = new AuthService(databaseService);
+
         // Create controllers
-        FileController fileController = new FileController(fileService);
+        FileController fileController = new FileController(fileService, authService);
         ModuleController moduleController = new ModuleController(moduleService);
-        
+        AuthController authController = new AuthController(authService);
+
         // Register routes
         server.createContext("/api/upload", fileController);
         server.createContext("/api/modules", moduleController);
+        server.createContext("/api/auth/login", authController);
+        server.createContext("/api/auth/logout", authController);
+        server.createContext("/api/auth/register", authController);
+        server.createContext("/api/auth/me", authController);
         
         // Set thread pool
         server.setExecutor(Executors.newFixedThreadPool(10));

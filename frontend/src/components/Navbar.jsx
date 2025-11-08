@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
-import { Upload, FileText, MessageCircle, BarChart3, Menu, X } from 'lucide-react'
+import { Upload, FileText, MessageCircle, BarChart3, Menu, X, LogOut, User } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const Navbar = ({ activeTab, setActiveTab }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, logout } = useAuth()
 
   const navItems = [
     { id: 'files', label: 'Files', icon: FileText },
@@ -41,6 +43,23 @@ const Navbar = ({ activeTab, setActiveTab }) => {
                 </button>
               )
             })}
+
+            <div className="flex items-center space-x-4 pl-6 border-l border-gray-200">
+              <div className="flex items-center text-sm text-gray-600">
+                <User className="mr-2 text-blue-600" size={18} />
+                <div className="text-left">
+                  <p className="font-semibold text-gray-800">{user?.displayName || user?.email}</p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -78,6 +97,24 @@ const Navbar = ({ activeTab, setActiveTab }) => {
                   </button>
                 )
               })}
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <div className="text-sm">
+                    <p className="font-semibold text-gray-800">{user?.displayName || user?.email}</p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      logout()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="text-red-600 hover:text-red-800 flex items-center space-x-1"
+                  >
+                    <LogOut size={14} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

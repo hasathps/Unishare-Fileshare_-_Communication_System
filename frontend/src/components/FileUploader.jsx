@@ -2,13 +2,14 @@ import React, { useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, File, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 const FileUploader = () => {
   const [selectedFiles, setSelectedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [selectedModule, setSelectedModule] = useState('')
-  const [uploaderName, setUploaderName] = useState('')
+  const { user } = useAuth()
 
   const modules = ['IN3111', 'CS101', 'MATH201']
 
@@ -42,8 +43,8 @@ const FileUploader = () => {
   }
 
   const handleUpload = async () => {
-    if (!selectedModule || !uploaderName || selectedFiles.length === 0) {
-      toast.error('Please fill all fields and select files')
+    if (!selectedModule || selectedFiles.length === 0) {
+      toast.error('Please choose a module and at least one file')
       return
     }
 
@@ -53,25 +54,24 @@ const FileUploader = () => {
       // Send actual files with multipart form data
       const formData = new FormData()
       formData.append('module', selectedModule)
-      formData.append('uploaderName', uploaderName)
+      formData.append('uploaderName', user?.displayName || user?.email || '')
       
       selectedFiles.forEach((fileObj, index) => {
         formData.append(`files`, fileObj.file)
       })
 
       // Upload to backend
-      const response = await axios.post('http://localhost:8080/api/upload', formData, {
+      const response = await api.post('/api/upload', formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
           'Accept': 'application/json'
-        },
-        timeout: 10000 // 10 second timeout
+        }
       })
       
       console.log('Upload response:', response.data)
       toast.success('Files uploaded successfully!')
       setSelectedFiles([])
-      setUploaderName('')
+      setSelectedModule('')
       
     } catch (error) {
       console.error('Upload error:', error)
@@ -113,20 +113,6 @@ const FileUploader = () => {
             <option key={module} value={module}>{module}</option>
           ))}
         </select>
-      </div>
-
-      {/* Uploader Name */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Your Name
-        </label>
-        <input
-          type="text"
-          value={uploaderName}
-          onChange={(e) => setUploaderName(e.target.value)}
-          placeholder="Enter your name"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
       </div>
 
       {/* File Drop Zone */}
@@ -186,9 +172,9 @@ const FileUploader = () => {
       {/* Upload Button */}
       <button
         onClick={handleUpload}
-        disabled={uploading || selectedFiles.length === 0 || !selectedModule || !uploaderName}
+        disabled={uploading || selectedFiles.length === 0 || !selectedModule}
         className={`w-full mt-6 py-3 px-4 rounded-md font-medium transition-colors ${
-          uploading || selectedFiles.length === 0 || !selectedModule || !uploaderName
+          uploading || selectedFiles.length === 0 || !selectedModule
             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
             : 'bg-blue-600 text-white hover:bg-blue-700'
         }`}

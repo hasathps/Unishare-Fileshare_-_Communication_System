@@ -4,10 +4,13 @@ import FilesSection from './components/FilesSection'
 import FileUploader from './components/FileUploader'
 import ChatSection from './components/ChatSection'
 import MonitorSection from './components/MonitorSection'
+import LoginForm from './components/LoginForm'
 import { Toaster } from 'react-hot-toast'
+import { useAuth } from './context/AuthContext'
 
 function App() {
   const [activeTab, setActiveTab] = useState('upload')
+  const { user, loading } = useAuth()
 
   const renderContent = () => {
     switch (activeTab) {
@@ -60,6 +63,23 @@ function App() {
           </div>
         )
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-600 text-lg font-medium">Loading UniShare...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <>
+        <LoginForm />
+        <Toaster position="top-right" />
+      </>
+    )
   }
 
   return (

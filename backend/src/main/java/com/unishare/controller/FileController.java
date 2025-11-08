@@ -1,5 +1,7 @@
 package com.unishare.controller;
 
+import com.unishare.model.User;
+import com.unishare.service.AuthService;
 import com.unishare.service.FileService;
 import com.unishare.model.FileInfo;
 import com.unishare.util.CORSFilter;
@@ -7,13 +9,11 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
-import java.net.URLDecoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.HttpCookie;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * Controller for handling file upload, download, and management
@@ -21,9 +21,11 @@ import java.util.HashMap;
 public class FileController implements HttpHandler {
     
     private final FileService fileService;
+    private final AuthService authService;
     
-    public FileController(FileService fileService) {
+    public FileController(FileService fileService, AuthService authService) {
         this.fileService = fileService;
+        this.authService = authService;
     }
     
     @Override
@@ -55,6 +57,13 @@ public class FileController implements HttpHandler {
         System.out.println("📤 File upload request received");
         
         try {
+            Optional<User> user = authService.findBySessionToken(extractToken(exchange));
+            if (user.isEmpty()) {
+                System.err.println("❌ Unauthorized upload attempt.");
+                sendErrorResponse(exchange, 401, "Authentication required");
+                return;
+            }
+
             // Read the request body once
             InputStream inputStream = exchange.getRequestBody();
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -72,6 +81,11 @@ public class FileController implements HttpHandler {
             
             String module = formData.get("module");
             String uploaderName = formData.get("uploaderName");
+            if (uploaderName == null || uploaderName.isBlank()) {
+                uploaderName = user.get().getDisplayName() != null && !user.get().getDisplayName().isBlank()
+                        ? user.get().getDisplayName()
+                        : user.get().getEmail();
+            }
             
             System.out.println("📝 Parsed form data: module=" + module + ", uploaderName=" + uploaderName);
             
@@ -98,13 +112,29 @@ public class FileController implements HttpHandler {
             exchange.getResponseBody().write(response.getBytes());
             exchange.getResponseBody().close();
             
-            System.out.println("✅ Upload successful: " + uploadedFiles.size() + " files to module " + module);
+            System.out.println("✅ Upload successful: " + uploadedFiles.size() + " files to module " + module
+                    + " by " + user.get().getEmail());
             
         } catch (Exception e) {
             System.err.println("❌ Upload failed: " + e.getMessage());
             e.printStackTrace();
             sendErrorResponse(exchange, 500, "Upload failed: " + e.getMessage());
         }
+    }
+
+    private String extractToken(HttpExchange exchange) {
+        List<String> cookies = exchange.getRequestHeaders().get("Cookie");
+        if (cookies == null) {
+            return null;
+        }
+        for (String header : cookies) {
+            for (HttpCookie cookie : HttpCookie.parse(header)) {
+                if (authService.getSessionCookieName().equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
     
     
@@ -178,25 +208,6 @@ public class FileController implements HttpHandler {
         
         System.out.println("📝 Final parsed form data: " + formData);
         return formData;
-    }
-    
-    private Map<String, String> parseQueryParams(String query) {
-        Map<String, String> params = new HashMap<>();
-        if (query != null) {
-            String[] pairs = query.split("&");
-            for (String pair : pairs) {
-                String[] keyValue = pair.split("=");
-                if (keyValue.length == 2) {
-                    try {
-                        params.put(URLDecoder.decode(keyValue[0], "UTF-8"),
-                                  URLDecoder.decode(keyValue[1], "UTF-8"));
-                    } catch (UnsupportedEncodingException e) {
-                        // Handle error
-                    }
-                }
-            }
-        }
-        return params;
     }
     
     private void sendErrorResponse(HttpExchange exchange, int code, String message) throws IOException {
