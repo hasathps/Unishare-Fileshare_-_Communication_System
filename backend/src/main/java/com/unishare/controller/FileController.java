@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Controller for handling file upload, download, and management
@@ -146,7 +147,7 @@ public class FileController implements HttpHandler {
     private Map<String, String> parseMultipartFormData(byte[] requestBody) throws IOException {
         Map<String, String> formData = new HashMap<>();
         
-        String body = new String(requestBody, "UTF-8");
+        String body = new String(requestBody, StandardCharsets.ISO_8859_1);
         
         System.out.println("📝 Raw request body length: " + requestBody.length + " bytes");
         System.out.println("📝 First 200 chars of body: " + body.substring(0, Math.min(200, body.length())));

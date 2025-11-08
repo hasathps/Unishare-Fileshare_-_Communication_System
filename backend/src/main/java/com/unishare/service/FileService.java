@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Service for handling file operations via Cloudinary with metadata stored in the database.
@@ -113,7 +114,7 @@ public class FileService {
     private List<UploadedFile> parseMultipartData(byte[] data) throws IOException {
         List<UploadedFile> files = new ArrayList<>();
 
-        String body = new String(data, "UTF-8");
+        String body = new String(data, StandardCharsets.ISO_8859_1);
         String boundary = extractBoundary(body);
         if (boundary == null) {
             return files;
@@ -170,7 +171,7 @@ public class FileService {
         }
 
         String headers = part.substring(0, headerEnd + 4);
-        int offset = body.indexOf(headers) + headers.getBytes("UTF-8").length;
+        int offset = body.indexOf(headers) + headers.getBytes(StandardCharsets.ISO_8859_1).length;
 
         int boundaryIndex = body.indexOf("\r\n" + boundary, offset);
         if (boundaryIndex == -1) {

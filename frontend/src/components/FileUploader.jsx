@@ -54,7 +54,6 @@ const FileUploader = () => {
       // Send actual files with multipart form data
       const formData = new FormData()
       formData.append('module', selectedModule)
-      formData.append('uploaderName', user?.displayName || user?.email || '')
       
       selectedFiles.forEach((fileObj, index) => {
         formData.append(`files`, fileObj.file)
@@ -68,10 +67,11 @@ const FileUploader = () => {
         }
       })
       
-      console.log('Upload response:', response.data)
-      toast.success('Files uploaded successfully!')
+      const uploadedFiles = response.data?.files || []
+      toast.success(`Uploaded ${uploadedFiles.length} file(s) successfully!`)
       setSelectedFiles([])
       setSelectedModule('')
+      return uploadedFiles
       
     } catch (error) {
       console.error('Upload error:', error)

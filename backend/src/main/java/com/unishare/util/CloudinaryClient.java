@@ -49,19 +49,17 @@ public final class CloudinaryClient {
 
     public UploadResult uploadRaw(byte[] content, String filename, String folder) throws IOException {
         long timestamp = Instant.now().getEpochSecond();
-        String resourceType = "raw";
 
         String folderParam = folder != null ? folder : "";
         StringBuilder toSign = new StringBuilder();
         if (!folderParam.isEmpty()) {
             toSign.append("folder=").append(folderParam).append("&");
         }
-        toSign.append("resource_type=").append(resourceType)
-                .append("&timestamp=").append(timestamp);
+        toSign.append("timestamp=").append(timestamp);
 
         String signature = sha1Hex(toSign + apiSecret);
 
-        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/%s/upload", cloudName, resourceType);
+        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/raw/upload", cloudName);
         HttpURLConnection connection = (HttpURLConnection) URI.create(endpoint).toURL().openConnection();
         String boundary = "----UniShareBoundary" + System.currentTimeMillis();
 
@@ -73,7 +71,6 @@ public final class CloudinaryClient {
             writeFormField(os, boundary, "api_key", apiKey);
             writeFormField(os, boundary, "timestamp", String.valueOf(timestamp));
             writeFormField(os, boundary, "signature", signature);
-            writeFormField(os, boundary, "resource_type", resourceType);
             if (!folderParam.isEmpty()) {
                 writeFormField(os, boundary, "folder", folderParam);
             }
@@ -109,11 +106,10 @@ public final class CloudinaryClient {
         Objects.requireNonNull(publicId, "publicId");
 
         long timestamp = Instant.now().getEpochSecond();
-        String resourceType = "raw";
-        String toSign = "public_id=" + publicId + "&resource_type=" + resourceType + "&timestamp=" + timestamp;
+        String toSign = "public_id=" + publicId + "&timestamp=" + timestamp;
         String signature = sha1Hex(toSign + apiSecret);
 
-        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/%s/destroy", cloudName, resourceType);
+        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/raw/destroy", cloudName);
         HttpURLConnection connection = (HttpURLConnection) URI.create(endpoint).toURL().openConnection();
         String boundary = "----UniShareBoundary" + System.currentTimeMillis();
 
@@ -126,7 +122,6 @@ public final class CloudinaryClient {
             writeFormField(os, boundary, "timestamp", String.valueOf(timestamp));
             writeFormField(os, boundary, "signature", signature);
             writeFormField(os, boundary, "public_id", publicId);
-            writeFormField(os, boundary, "resource_type", resourceType);
             os.write(("--" + boundary + "--").getBytes(StandardCharsets.UTF_8));
         }
 
