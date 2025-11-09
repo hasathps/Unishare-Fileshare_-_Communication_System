@@ -57,16 +57,19 @@ public final class CloudinaryClient {
         long timestamp = Instant.now().getEpochSecond();
 
         String folderParam = folder != null ? folder : "";
+
+        // Build signature parameters in alphabetical order (Cloudinary requirement)
         StringBuilder toSign = new StringBuilder();
         if (!folderParam.isEmpty()) {
             toSign.append("folder=").append(folderParam).append("&");
         }
         toSign.append("timestamp=").append(timestamp);
+        // Don't include type in signature - it's a preset parameter
 
         String signature = sha1Hex(toSign + apiSecret);
 
-        // Use 'auto' resource type instead of 'raw' to let Cloudinary detect and serve
-        // a more specific MIME type (e.g. application/pdf) for previews.
+        // Use 'auto' resource type to let Cloudinary detect MIME type
+        // No explicit type parameter needed - defaults to 'upload' (public)
         String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/auto/upload", cloudName);
         HttpURLConnection connection = (HttpURLConnection) URI.create(endpoint).toURL().openConnection();
         String boundary = "----UniShareBoundary" + System.currentTimeMillis();

@@ -153,6 +153,19 @@ public class FileController implements HttpHandler {
                 return;
             }
 
+            // Check if file exists and user owns it
+            Optional<FileInfo> fileInfo = fileService.findById(id);
+            if (fileInfo.isEmpty()) {
+                sendErrorResponse(exchange, 404, "File not found");
+                return;
+            }
+
+            // Verify the user owns this file
+            if (!fileInfo.get().getUploaderName().equals(user.get().getEmail())) {
+                sendErrorResponse(exchange, 403, "You can only delete your own files");
+                return;
+            }
+
             try {
                 fileService.deleteFile(id);
             } catch (Exception e) {

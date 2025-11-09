@@ -9,8 +9,10 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 
 const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
+  const { user } = useAuth();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -202,13 +204,16 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
                         <Download size={16} />
                       </a>
                     )}
-                    <button
-                      onClick={() => handleDelete(f)}
-                      className="text-red-600 hover:text-red-800 p-1"
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* Only show delete button if current user uploaded this file */}
+                    {user && f.uploaderName === user.email && (
+                      <button
+                        onClick={() => handleDelete(f)}
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
