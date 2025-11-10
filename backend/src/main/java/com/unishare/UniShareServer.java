@@ -9,6 +9,7 @@ import com.unishare.service.DatabaseService;
 import com.unishare.service.FileMetadataService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
+import com.unishare.service.DownloadManager;
 import com.unishare.service.SchemaInitializer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -56,15 +57,21 @@ public class UniShareServer {
         FileService fileService = new FileService(fileMetadataService);
         ModuleService moduleService = new ModuleService();
         AuthService authService = new AuthService(databaseService);
+        DownloadManager downloadManager = new DownloadManager(fileMetadataService);
 
         // Create controllers
-        FileController fileController = new FileController(fileService, authService);
+        FileController fileController = new FileController(fileService, authService, downloadManager);
         ModuleController moduleController = new ModuleController(moduleService, fileService);
         AuthController authController = new AuthController(authService);
 
         // Register routes
         server.createContext("/api/upload", fileController);
         server.createContext("/api/files", fileController);
+        server.createContext("/api/download", fileController);
+        server.createContext("/api/download-status", fileController);
+        server.createContext("/api/download-file", fileController);
+        server.createContext("/api/download-stats", fileController);
+        server.createContext("/api/download-cancel", fileController);
         server.createContext("/api/modules", moduleController);
         server.createContext("/api/auth/login", authController);
         server.createContext("/api/auth/logout", authController);
@@ -86,6 +93,7 @@ public class UniShareServer {
         // Keep server running
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("\n🛑 Shutting down UniShare Server...");
+            downloadManager.shutdown();
             server.stop(0);
             System.out.println("✅ Server stopped successfully!");
         }));

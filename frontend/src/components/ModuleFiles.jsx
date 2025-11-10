@@ -10,12 +10,15 @@ import {
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { downloadService } from "../services/downloadService";
+import DownloadManager from "./DownloadManager";
 
 const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
   const { user } = useAuth();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
 
   useEffect(() => {
     if (!module) return;
@@ -81,6 +84,34 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
     }
   };
 
+  const handleDownload = async (file) => {
+    try {
+      // All downloads use managed approach for concurrent handling
+      const sessionId = await downloadService.download(file.id, file.filename);
+      
+      toast.success(`Download started: ${file.filename}`);
+      
+      // Show download manager
+      setDownloadManagerOpen(true);
+
+      // Listen for completion
+      downloadService.addProgressListener(sessionId, (status) => {
+        if (status.status === 'completed') {
+          toast.success(`Download completed: ${file.filename}`);
+          downloadService.removeProgressListener(sessionId, arguments.callee);
+        } else if (status.status === 'failed') {
+          toast.error(`Download failed: ${file.filename} - ${status.error || 'Unknown error'}`);
+          downloadService.removeProgressListener(sessionId, arguments.callee);
+        }
+      });
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error(`Download failed: ${error.message}`);
+    }
+  };
+
+ 
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return files.filter(
@@ -122,6 +153,12 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
           className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium flex items-center hover:bg-blue-700 shadow"
         >
           <UploadCloud size={18} className="mr-2" /> Upload Files
+        </button>
+        <button
+          onClick={() => setDownloadManagerOpen(true)}
+          className="px-5 py-2 rounded-lg bg-green-600 text-white font-medium flex items-center hover:bg-green-700 shadow"
+        >
+          <Download size={18} className="mr-2" /> Downloads
         </button>
       </div>
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -192,18 +229,16 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
                     >
                       <Eye size={16} />
                     </button>
-                    {f.secureUrl && (
-                      <a
-                        href={f.secureUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="text-green-600 hover:text-green-800 p-1"
-                        title="Download"
-                      >
-                        <Download size={16} />
-                      </a>
-                    )}
+                    
+                    {/*Download Button */}
+                    <button
+                      onClick={() => handleDownload(f)}
+                      className="text-green-600 hover:text-green-800 p-1"
+                      title="Download File"
+                    >
+                      <Download size={16} />
+                    </button>
+                    
                     {/* Only show delete button if current user uploaded this file */}
                     {user && f.uploaderName === user.email && (
                       <button
@@ -221,6 +256,12 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Download Manager Modal */}
+      <DownloadManager
+        isOpen={downloadManagerOpen}
+        onClose={() => setDownloadManagerOpen(false)}
+      />
     </div>
   );
 };
