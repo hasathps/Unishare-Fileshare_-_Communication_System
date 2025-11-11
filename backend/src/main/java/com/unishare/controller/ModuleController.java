@@ -85,7 +85,11 @@ public class ModuleController implements HttpHandler {
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get modules: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get modules");
@@ -122,7 +126,11 @@ public class ModuleController implements HttpHandler {
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get module files: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get module files");
