@@ -29,11 +29,22 @@ public final class DatabaseService {
 
     private DatabaseService() {
         this.credentials = DatabaseConfig.loadCredentials();
+        logResolvedCredentials();
         loadDriver();
     }
 
     public static DatabaseService getInstance() {
         return INSTANCE;
+    }
+
+    private void logResolvedCredentials() {
+        String jdbcUrl = credentials.jdbcUrl();
+        String user = credentials.properties().getProperty("user");
+
+        String maskedUrl = jdbcUrl.replaceAll("password=[^&]+", "password=****");
+
+        System.out.println("[DatabaseService] JDBC URL resolved to: " + maskedUrl);
+        System.out.println("[DatabaseService] Database user: " + user);
     }
 
     /**
