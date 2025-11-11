@@ -1,62 +1,63 @@
 package com.unishare.service;
 
 import com.unishare.model.ModuleInfo;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * Service for handling module-related operations. Currently provides a static
- * catalog
- * which can later be replaced or merged with database-backed modules.
+ * Service for handling module-related operations.
+ * Fetches modules from database.
  */
 public class ModuleService {
 
-    /**
-     * Titles provided by product requirements (landing page list).
-     */
-    private static final List<String> MODULE_TITLES = Arrays.asList(
-            "Applied Numerical Methods",
-            "Automata Theory",
-            "Artificial Intelligence",
-            "Enterprise Application Development",
-            "Network programming",
-            "Mobile Applications Development",
-            "Embedded Systems",
-            "Wireless Communication & Mobile Networks",
-            "Human Computer Interaction",
-            "Communication Skills and Professional Conduct",
-            "Management Information Systems");
+    private final DatabaseService databaseService;
 
-    /**
-     * Build immutable list of ModuleInfo objects (code, title, description).
-     * Code is a URL-safe slug of the title.
-     */
-    private static final List<ModuleInfo> MODULES;
-
-    static {
-        List<ModuleInfo> list = new ArrayList<>();
-        for (String title : MODULE_TITLES) {
-            String code = slugify(title);
-            // For now description equals title; could be extended later.
-            list.add(new ModuleInfo(code, title, title));
-        }
-        MODULES = List.copyOf(list);
+    public ModuleService(DatabaseService databaseService) {
+        this.databaseService = databaseService;
     }
 
     public List<ModuleInfo> getModules() {
-        return MODULES;
+        List<ModuleInfo> modules = new ArrayList<>();
+        try (Connection conn = databaseService.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT code, name, description FROM modules ORDER BY name ASC");
+                ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                String code = rs.getString("code");
+                String name = rs.getString("name");
+                String description = rs.getString("description");
+                modules.add(new ModuleInfo(code, name, description));
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to fetch modules: " + e.getMessage());
+        }
+        return modules;
     }
 
     public ModuleInfo findByCode(String code) {
         if (code == null)
             return null;
-        for (ModuleInfo info : MODULES) {
-            if (info.getCode().equalsIgnoreCase(code)) {
-                return info;
+
+        try (Connection conn = databaseService.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT code, name, description FROM modules WHERE code = ?")) {
+            stmt.setString(1, code);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new ModuleInfo(
+                            rs.getString("code"),
+                            rs.getString("name"),
+                            rs.getString("description"));
+                }
             }
+        } catch (SQLException e) {
+            System.err.println("Failed to find module: " + e.getMessage());
         }
         return null;
     }
@@ -70,21 +71,12 @@ public class ModuleService {
         return info != null ? info.getDescription() : "Unknown Module";
     }
 
-    private static String slugify(String title) {
-        String lower = title.toLowerCase(Locale.ENGLISH);
-        // Replace ampersand with 'and' for consistency
-        lower = lower.replace("&", " and ");
-        // Keep alphanumeric and spaces
-        lower = lower.replaceAll("[^a-z0-9 ]", "");
-        // Collapse multiple spaces
-        lower = lower.replaceAll(" +", "-");
-        return lower;
-    }
-
     /**
      * Convenience: return just module codes (used by legacy callers).
      */
     public List<String> getAvailableModules() {
-        return MODULES.stream().map(ModuleInfo::getCode).collect(Collectors.toList());
+        return getModules().stream()
+                .map(ModuleInfo::getCode)
+                .collect(Collectors.toList());
     }
 }

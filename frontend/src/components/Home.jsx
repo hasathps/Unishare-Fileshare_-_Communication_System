@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Bell, BellOff } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +9,7 @@ const Home = ({ onSelectModule }) => {
   const [modules, setModules] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [subscriptions, setSubscriptions] = useState([]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -41,7 +42,24 @@ const Home = ({ onSelectModule }) => {
       }
     };
 
+    const fetchSubscriptions = async () => {
+      try {
+        const { data } = await api.get("/api/subscriptions", {
+          signal: abortController.signal,
+        });
+        if (data && Array.isArray(data.subscriptions)) {
+          setSubscriptions(data.subscriptions);
+        }
+      } catch (e) {
+        if (!abortController.signal.aborted) {
+          console.error("Failed to load subscriptions", e);
+          // Don't show error toast for subscriptions, just log it
+        }
+      }
+    };
+
     fetchModules();
+    fetchSubscriptions();
 
     // Cleanup: abort request if component unmounts
     return () => {
@@ -54,6 +72,34 @@ const Home = ({ onSelectModule }) => {
       m.name.toLowerCase().includes(query.toLowerCase()) ||
       m.code.toLowerCase().includes(query.toLowerCase())
   );
+
+  const isSubscribed = (moduleCode) => subscriptions.includes(moduleCode);
+
+  const handleSubscriptionToggle = async (e, moduleCode) => {
+    e.stopPropagation(); // Prevent module card click
+
+    const subscribed = isSubscribed(moduleCode);
+    const endpoint = subscribed
+      ? `/api/subscriptions/${moduleCode}/unsubscribe`
+      : `/api/subscriptions/${moduleCode}/subscribe`;
+
+    try {
+      const { data } = await api.post(endpoint);
+
+      if (data.success) {
+        if (subscribed) {
+          setSubscriptions(subscriptions.filter((code) => code !== moduleCode));
+          toast.success(`Unsubscribed from module`);
+        } else {
+          setSubscriptions([...subscriptions, moduleCode]);
+          toast.success(`Subscribed to module notifications`);
+        }
+      }
+    } catch (e) {
+      console.error("Subscription toggle failed", e);
+      toast.error("Failed to update subscription");
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -81,20 +127,41 @@ const Home = ({ onSelectModule }) => {
       ) : (
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((mod) => (
-            <button
+            <div
               key={mod.code}
+              className="relative bg-white rounded-xl shadow hover:shadow-md transition p-5 border border-gray-200 group cursor-pointer"
               onClick={() => onSelectModule(mod)}
-              className="text-left bg-white rounded-xl shadow hover:shadow-md transition p-5 border border-gray-200 group"
             >
               <div className="flex justify-between items-start mb-2">
                 <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 group-hover:bg-blue-200">
                   {mod.code}
                 </span>
-                {mod.fileCount > 0 && (
-                  <span className="text-xs text-gray-500">
-                    {mod.fileCount} file{mod.fileCount !== 1 && "s"}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {mod.fileCount > 0 && (
+                    <span className="text-xs text-gray-500">
+                      {mod.fileCount} file{mod.fileCount !== 1 && "s"}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => handleSubscriptionToggle(e, mod.code)}
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isSubscribed(mod.code)
+                        ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                    title={
+                      isSubscribed(mod.code)
+                        ? "Unsubscribe from notifications"
+                        : "Subscribe to notifications"
+                    }
+                  >
+                    {isSubscribed(mod.code) ? (
+                      <Bell size={14} fill="currentColor" />
+                    ) : (
+                      <BellOff size={14} />
+                    )}
+                  </button>
+                </div>
               </div>
               <h2 className="text-lg font-semibold text-gray-800 mb-1 group-hover:text-blue-700">
                 {mod.name}
@@ -102,7 +169,7 @@ const Home = ({ onSelectModule }) => {
               <p className="text-sm text-gray-600 line-clamp-3">
                 {mod.description}
               </p>
-            </button>
+            </div>
           ))}
           {filtered.length === 0 && (
             <div className="col-span-full text-center text-gray-500">

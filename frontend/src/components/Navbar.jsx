@@ -10,8 +10,9 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "./NotificationBell";
 
-const Navbar = ({ activeTab, setActiveTab }) => {
+const Navbar = ({ activeTab, setActiveTab, onModuleSelect }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
 
@@ -54,6 +55,16 @@ const Navbar = ({ activeTab, setActiveTab }) => {
             })}
 
             <div className="flex items-center space-x-4 pl-6 border-l border-gray-200">
+              {/* Notification Bell */}
+              <NotificationBell
+                onModuleClick={(module) => {
+                  if (onModuleSelect) {
+                    setActiveTab("home");
+                    setTimeout(() => onModuleSelect(module), 100);
+                  }
+                }}
+              />
+
               <div className="flex items-center text-sm text-gray-600">
                 <User className="mr-2 text-blue-600" size={18} />
                 <div className="text-left">

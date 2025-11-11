@@ -6,6 +6,8 @@ import com.unishare.model.FileInfo;
 import com.unishare.model.User;
 import com.unishare.service.AuthService;
 import com.unishare.service.FileService;
+import com.unishare.service.ModuleService;
+import com.unishare.service.NotificationService;
 import com.unishare.util.CORSFilter;
 import java.io.*;
 import java.net.HttpCookie;
@@ -22,10 +24,15 @@ public class FileController implements HttpHandler {
 
     private final FileService fileService;
     private final AuthService authService;
+    private final NotificationService notificationService;
+    private final ModuleService moduleService;
 
-    public FileController(FileService fileService, AuthService authService) {
+    public FileController(FileService fileService, AuthService authService,
+            NotificationService notificationService, ModuleService moduleService) {
         this.fileService = fileService;
         this.authService = authService;
+        this.notificationService = notificationService;
+        this.moduleService = moduleService;
     }
 
     @Override
@@ -107,6 +114,21 @@ public class FileController implements HttpHandler {
 
             // Get uploaded files
             List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderEmail, requestBody);
+
+            // Notify subscribers about the file upload
+            if (!uploadedFiles.isEmpty()) {
+                com.unishare.model.ModuleInfo moduleInfo = moduleService.findByCode(module);
+                String moduleName = (moduleInfo != null) ? moduleInfo.getName() : module;
+
+                for (FileInfo file : uploadedFiles) {
+                    notificationService.notifyFileUpload(
+                            module,
+                            moduleName,
+                            file.getFilename(),
+                            uploaderLabel,
+                            user.get().getId());
+                }
+            }
 
             // Send success response
             String filesJson = uploadedFiles.stream()

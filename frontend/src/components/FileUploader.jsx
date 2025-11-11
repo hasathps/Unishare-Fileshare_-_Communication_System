@@ -73,6 +73,10 @@ const FileUploader = ({ initialModule, onUploaded }) => {
       const formData = new FormData();
       formData.append("module", selectedModule);
 
+      // Add uploader name from user context
+      const uploaderName = user?.displayName || user?.email || "Anonymous";
+      formData.append("uploaderName", uploaderName);
+
       selectedFiles.forEach((fileObj, index) => {
         formData.append(`files`, fileObj.file);
       });
