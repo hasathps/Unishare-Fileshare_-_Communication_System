@@ -42,9 +42,7 @@ public final class DatabaseConfig {
     private static DatabaseCredentials parseConnectionString(String connectionString) {
         Objects.requireNonNull(connectionString, "connectionString");
 
-        String sanitized = stripWrappingQuotes(connectionString.trim());
-
-        String normalized = sanitized.replaceFirst("^postgres(ql)?://", "https://");
+        String normalized = connectionString.replaceFirst("^postgres(ql)?://", "https://");
 
         URI uri;
         try {
@@ -93,26 +91,6 @@ public final class DatabaseConfig {
         properties.setProperty("password", password);
 
         return new DatabaseCredentials(jdbcUrl.toString(), properties);
-    }
-
-    private static String stripWrappingQuotes(String value) {
-        String result = value;
-        if (result.length() >= 2) {
-            if ((result.startsWith("\"") && result.endsWith("\"")) ||
-                    (result.startsWith("'") && result.endsWith("'"))) {
-                result = result.substring(1, result.length() - 1).trim();
-            }
-        }
-
-        if (result.endsWith("'") || result.endsWith("\"")) {
-            result = result.substring(0, result.length() - 1).trim();
-        }
-
-        if (result.startsWith("'") || result.startsWith("\"")) {
-            result = result.substring(1).trim();
-        }
-
-        return result;
     }
 
     /**
