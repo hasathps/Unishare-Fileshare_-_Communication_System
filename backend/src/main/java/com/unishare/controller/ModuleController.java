@@ -1,10 +1,12 @@
 package com.unishare.controller;
 
-import com.unishare.service.ModuleService;
-import com.unishare.util.CORSFilter;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-
+import com.unishare.model.FileInfo;
+import com.unishare.model.ModuleInfo;
+import com.unishare.service.FileService;
+import com.unishare.service.ModuleService;
+import com.unishare.util.CORSFilter;
 import java.io.IOException;
 import java.util.List;
 
@@ -12,18 +14,24 @@ import java.util.List;
  * Controller for handling module-related requests
  */
 public class ModuleController implements HttpHandler {
-    
+
     private final ModuleService moduleService;
-    
+    private final FileService fileService;
+
     public ModuleController(ModuleService moduleService) {
-        this.moduleService = moduleService;
+        this(moduleService, null);
     }
-    
+
+    public ModuleController(ModuleService moduleService, FileService fileService) {
+        this.moduleService = moduleService;
+        this.fileService = fileService; // may be null if not wired yet
+    }
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String method = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
-        
+
         try {
             switch (method) {
                 case "GET":
@@ -44,50 +52,79 @@ public class ModuleController implements HttpHandler {
             sendErrorResponse(exchange, 500, "Internal Server Error");
         }
     }
-    
+
     public void handleModules(HttpExchange exchange) throws IOException {
         try {
-            List<String> modules = moduleService.getAvailableModules();
-            
-            // Convert to JSON
+            List<ModuleInfo> modules = moduleService.getModules();
+
             StringBuilder json = new StringBuilder("{\"modules\":[");
             for (int i = 0; i < modules.size(); i++) {
-                if (i > 0) json.append(",");
-                json.append("\"").append(modules.get(i)).append("\"");
+                ModuleInfo m = modules.get(i);
+                if (i > 0)
+                    json.append(",");
+                json.append("{\"code\":\"").append(m.getCode()).append("\",")
+                        .append("\"name\":\"").append(escape(m.getName())).append("\",")
+                        .append("\"description\":\"").append(escape(m.getDescription())).append("\",")
+                        .append("\"fileCount\":").append(m.getFileCount()).append("}");
             }
             json.append("]}");
-            
+
+            byte[] bytes = json.toString().getBytes();
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, json.length());
-            exchange.getResponseBody().write(json.toString().getBytes());
-            
+            exchange.sendResponseHeaders(200, bytes.length);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get modules: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get modules");
         }
     }
-    
+
     public void handleModuleFiles(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
-        String module = path.substring("/api/modules/".length());
-        
+        String moduleCode = path.substring("/api/modules/".length());
+
         try {
-            // This would return files for a specific module
-            // For now, return a simple response
-            String response = "{\"module\":\"" + module + "\",\"files\":[]}";
-            
+            if (!moduleService.isValidModule(moduleCode)) {
+                sendErrorResponse(exchange, 404, "Module not found");
+                return;
+            }
+
+            List<FileInfo> files = fileService != null ? fileService.getFilesForModule(moduleCode) : List.of();
+            ModuleInfo moduleInfo = moduleService.findByCode(moduleCode);
+
+            StringBuilder json = new StringBuilder();
+            json.append("{\"module\":{");
+            json.append("\"code\":\"").append(moduleInfo.getCode()).append("\",");
+            json.append("\"name\":\"").append(escape(moduleInfo.getName())).append("\",");
+            json.append("\"description\":\"").append(escape(moduleInfo.getDescription())).append("\"");
+            json.append("},\"files\":[");
+            for (int i = 0; i < files.size(); i++) {
+                if (i > 0)
+                    json.append(",");
+                json.append(files.get(i).toJson());
+            }
+            json.append("]}");
+
+            byte[] bytes = json.toString().getBytes();
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, response.getBytes().length);
-            exchange.getResponseBody().write(response.getBytes());
-            
+            exchange.sendResponseHeaders(200, bytes.length);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get module files: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get module files");
         }
     }
-    
+
     private void sendErrorResponse(HttpExchange exchange, int code, String message) throws IOException {
         String response = "{\"error\":\"" + message + "\"}";
         CORSFilter.addCORSHeaders(exchange);
@@ -95,5 +132,46 @@ public class ModuleController implements HttpHandler {
         exchange.sendResponseHeaders(code, response.getBytes().length);
         exchange.getResponseBody().write(response.getBytes());
         exchange.close();
+    }
+
+    private String escape(String s) {
+        if (s == null) {
+            return "";
+        }
+
+        StringBuilder escaped = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+            }
+        }
+        return escaped.toString();
     }
 }

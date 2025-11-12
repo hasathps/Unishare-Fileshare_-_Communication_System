@@ -1,103 +1,134 @@
-import React, { useState } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Upload, File, X } from 'lucide-react'
-import toast from 'react-hot-toast'
-import api from '../services/api'
-import { useAuth } from '../context/AuthContext'
+import React, { useEffect, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { Upload, File, X } from "lucide-react";
+import toast from "react-hot-toast";
+import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
-const FileUploader = () => {
-  const [selectedFiles, setSelectedFiles] = useState([])
-  const [uploading, setUploading] = useState(false)
-  const [selectedModule, setSelectedModule] = useState('')
-  const { user } = useAuth()
+const FileUploader = ({ initialModule, onUploaded }) => {
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [selectedModule, setSelectedModule] = useState(initialModule || "");
+  const [availableModules, setAvailableModules] = useState([]);
+  const { user } = useAuth();
 
-  const modules = ['IN3111', 'CS101', 'MATH201']
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        const { data } = await api.get("/api/modules");
+        const list = (data.modules || []).map((m) => m.code);
+        setAvailableModules(list);
+        // If initialModule not provided, preselect first
+        if (!initialModule && list.length > 0) {
+          setSelectedModule(list[0]);
+        }
+      } catch (e) {
+        console.error("Failed to load modules for uploader", e);
+      }
+    };
+    fetchModules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onDrop = (acceptedFiles) => {
-    const newFiles = acceptedFiles.map(file => ({
+    const newFiles = acceptedFiles.map((file) => ({
       file,
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
       size: file.size,
-      type: file.type
-    }))
-    setSelectedFiles(prev => [...prev, ...newFiles])
-    toast.success(`${acceptedFiles.length} file(s) added`)
-  }
+      type: file.type,
+    }));
+    setSelectedFiles((prev) => [...prev, ...newFiles]);
+    toast.success(`${acceptedFiles.length} file(s) added`);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt'],
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif']
+      "application/pdf": [".pdf"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        [".docx"],
+      "text/plain": [".txt"],
+      "image/*": [".png", ".jpg", ".jpeg", ".gif"],
     },
-    maxSize: 10 * 1024 * 1024 // 10MB
-  })
+    maxSize: 10 * 1024 * 1024, // 10MB
+  });
 
   const removeFile = (fileId) => {
-    setSelectedFiles(prev => prev.filter(file => file.id !== fileId))
-    toast.success('File removed')
-  }
+    setSelectedFiles((prev) => prev.filter((file) => file.id !== fileId));
+    toast.success("File removed");
+  };
 
   const handleUpload = async () => {
     if (!selectedModule || selectedFiles.length === 0) {
-      toast.error('Please choose a module and at least one file')
-      return
+      toast.error("Please choose a module and at least one file");
+      return;
     }
 
-    setUploading(true)
-    
+    setUploading(true);
+
     try {
       // Send actual files with multipart form data
-      const formData = new FormData()
-      formData.append('module', selectedModule)
-      
+      const formData = new FormData();
+      formData.append("module", selectedModule);
+
+      // Add uploader name from user context
+      const uploaderName = user?.displayName || user?.email || "Anonymous";
+      formData.append("uploaderName", uploaderName);
+
       selectedFiles.forEach((fileObj, index) => {
-        formData.append(`files`, fileObj.file)
-      })
+        formData.append(`files`, fileObj.file);
+      });
 
       // Upload to backend
-      const response = await api.post('/api/upload', formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Accept': 'application/json'
-        }
-      })
-      
-      const uploadedFiles = response.data?.files || []
-      toast.success(`Uploaded ${uploadedFiles.length} file(s) successfully!`)
-      setSelectedFiles([])
-      setSelectedModule('')
-      return uploadedFiles
-      
+      const response = await api.post("/api/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Accept: "application/json",
+        },
+      });
+
+      const uploadedFiles = response.data?.files || [];
+      toast.success(`Uploaded ${uploadedFiles.length} file(s) successfully!`);
+      setSelectedFiles([]);
+      setSelectedModule("");
+      if (typeof onUploaded === "function") {
+        try {
+          onUploaded(uploadedFiles);
+        } catch (_) {}
+      }
+      return uploadedFiles;
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error("Upload error:", error);
       if (error.response) {
-        console.error('Error response:', error.response.data)
-        toast.error('Upload failed: ' + (error.response.data?.error || error.response.statusText))
+        console.error("Error response:", error.response.data);
+        toast.error(
+          "Upload failed: " +
+            (error.response.data?.error || error.response.statusText)
+        );
       } else {
-        toast.error('Upload failed: ' + error.message)
+        toast.error("Upload failed: " + error.message);
       }
     } finally {
-      setUploading(false)
+      setUploading(false);
     }
-  }
+  };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload Study Materials</h2>
-      
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        Upload Study Materials
+      </h2>
+
       {/* Module Selection */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -109,8 +140,10 @@ const FileUploader = () => {
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Choose a module...</option>
-          {modules.map(module => (
-            <option key={module} value={module}>{module}</option>
+          {availableModules.map((module) => (
+            <option key={module} value={module}>
+              {module}
+            </option>
           ))}
         </select>
       </div>
@@ -120,8 +153,8 @@ const FileUploader = () => {
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-blue-400 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
+            ? "border-blue-400 bg-blue-50"
+            : "border-gray-300 hover:border-gray-400"
         }`}
       >
         <input {...getInputProps()} />
@@ -143,7 +176,9 @@ const FileUploader = () => {
       {/* Selected Files */}
       {selectedFiles.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Selected Files:</h3>
+          <h3 className="text-lg font-medium text-gray-800 mb-2">
+            Selected Files:
+          </h3>
           <div className="space-y-2">
             {selectedFiles.map((fileObj) => (
               <div
@@ -153,8 +188,12 @@ const FileUploader = () => {
                 <div className="flex items-center">
                   <File className="h-5 w-5 text-gray-500 mr-2" />
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{fileObj.name}</p>
-                    <p className="text-xs text-gray-500">{formatFileSize(fileObj.size)}</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {fileObj.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(fileObj.size)}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -175,14 +214,14 @@ const FileUploader = () => {
         disabled={uploading || selectedFiles.length === 0 || !selectedModule}
         className={`w-full mt-6 py-3 px-4 rounded-md font-medium transition-colors ${
           uploading || selectedFiles.length === 0 || !selectedModule
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
+            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+            : "bg-blue-600 text-white hover:bg-blue-700"
         }`}
       >
-        {uploading ? 'Uploading...' : `Upload ${selectedFiles.length} File(s)`}
+        {uploading ? "Uploading..." : `Upload ${selectedFiles.length} File(s)`}
       </button>
     </div>
-  )
-}
+  );
+};
 
-export default FileUploader
+export default FileUploader;

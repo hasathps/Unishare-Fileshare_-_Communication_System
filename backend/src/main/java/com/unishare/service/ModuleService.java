@@ -1,39 +1,98 @@
 package com.unishare.service;
 
-import java.util.Arrays;
+import com.unishare.model.ModuleInfo;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * Service for handling module-related operations
+ * Service for handling module-related operations.
+ * Fetches modules from database.
  */
 public class ModuleService {
-    
-    private static final List<String> AVAILABLE_MODULES = Arrays.asList(
-        "IN3111", "CS101", "MATH201", "PHYS202", "CHEM103"
-    );
-    
-    public List<String> getAvailableModules() {
-        return AVAILABLE_MODULES;
+
+    private final DatabaseService databaseService;
+
+    public ModuleService(DatabaseService databaseService) {
+        this.databaseService = databaseService;
     }
-    
-    public boolean isValidModule(String module) {
-        return AVAILABLE_MODULES.contains(module);
-    }
-    
-    public String getModuleDescription(String module) {
-        switch (module) {
-            case "IN3111":
-                return "Information Systems";
-            case "CS101":
-                return "Computer Science Fundamentals";
-            case "MATH201":
-                return "Advanced Mathematics";
-            case "PHYS202":
-                return "Physics II";
-            case "CHEM103":
-                return "Chemistry Fundamentals";
-            default:
-                return "Unknown Module";
+
+    public List<ModuleInfo> getModules() {
+        List<ModuleInfo> modules = new ArrayList<>();
+        try (Connection conn = databaseService.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT m.code, m.name, m.description, COALESCE(fc.file_count, 0) AS file_count " +
+                                "FROM modules m " +
+                                "LEFT JOIN (" +
+                                "    SELECT module, COUNT(*) AS file_count " +
+                                "    FROM files " +
+                                "    GROUP BY module" +
+                                ") fc ON fc.module = m.code " +
+                                "ORDER BY m.name ASC");
+                ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                String code = rs.getString("code");
+                String name = rs.getString("name");
+                String description = rs.getString("description");
+                int fileCount = rs.getInt("file_count");
+                modules.add(new ModuleInfo(code, name, description, fileCount));
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to fetch modules: " + e.getMessage());
         }
+        return modules;
+    }
+
+    public ModuleInfo findByCode(String code) {
+        if (code == null)
+            return null;
+
+        try (Connection conn = databaseService.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT m.code, m.name, m.description, COALESCE(fc.file_count, 0) AS file_count " +
+                                "FROM modules m " +
+                                "LEFT JOIN (" +
+                                "    SELECT module, COUNT(*) AS file_count " +
+                                "    FROM files " +
+                                "    GROUP BY module" +
+                                ") fc ON fc.module = m.code " +
+                                "WHERE m.code = ?")) {
+            stmt.setString(1, code);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new ModuleInfo(
+                            rs.getString("code"),
+                            rs.getString("name"),
+                            rs.getString("description"),
+                            rs.getInt("file_count"));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Failed to find module: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public boolean isValidModule(String code) {
+        return findByCode(code) != null;
+    }
+
+    public String getModuleDescription(String code) {
+        ModuleInfo info = findByCode(code);
+        return info != null ? info.getDescription() : "Unknown Module";
+    }
+
+    /**
+     * Convenience: return just module codes (used by legacy callers).
+     */
+    public List<String> getAvailableModules() {
+        return getModules().stream()
+                .map(ModuleInfo::getCode)
+                .collect(Collectors.toList());
     }
 }

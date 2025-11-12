@@ -1,7 +1,6 @@
 package com.unishare.util;
 
 import com.unishare.config.CloudinaryConfig;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +16,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Minimal Cloudinary client that performs raw uploads and deletions via REST API.
+ * Minimal Cloudinary client that performs raw uploads and deletions via REST
+ * API.
  */
 public final class CloudinaryClient {
 
@@ -40,26 +40,37 @@ public final class CloudinaryClient {
         }
 
         ParsedCredentials credentials = ParsedCredentials.parse(CloudinaryConfig.getCloudinaryUrl());
-        CloudinaryClient created = new CloudinaryClient(credentials.cloudName, credentials.apiKey, credentials.apiSecret);
+        CloudinaryClient created = new CloudinaryClient(credentials.cloudName, credentials.apiKey,
+                credentials.apiSecret);
         if (INSTANCE.compareAndSet(null, created)) {
             return created;
         }
         return INSTANCE.get();
     }
 
+    /**
+     * Uploads a file to Cloudinary using resource_type=auto so PDFs, images, and
+     * other
+     * supported types receive correct Content-Type headers for inline preview.
+     */
     public UploadResult uploadRaw(byte[] content, String filename, String folder) throws IOException {
         long timestamp = Instant.now().getEpochSecond();
 
         String folderParam = folder != null ? folder : "";
+
+        // Build signature parameters in alphabetical order (Cloudinary requirement)
         StringBuilder toSign = new StringBuilder();
         if (!folderParam.isEmpty()) {
             toSign.append("folder=").append(folderParam).append("&");
         }
         toSign.append("timestamp=").append(timestamp);
+        // Don't include type in signature - it's a preset parameter
 
         String signature = sha1Hex(toSign + apiSecret);
 
-        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/raw/upload", cloudName);
+        // Use 'auto' resource type to let Cloudinary detect MIME type
+        // No explicit type parameter needed - defaults to 'upload' (public)
+        String endpoint = String.format("https://api.cloudinary.com/v1_1/%s/auto/upload", cloudName);
         HttpURLConnection connection = (HttpURLConnection) URI.create(endpoint).toURL().openConnection();
         String boundary = "----UniShareBoundary" + System.currentTimeMillis();
 
@@ -140,7 +151,8 @@ public final class CloudinaryClient {
         os.write("\r\n".getBytes(StandardCharsets.UTF_8));
     }
 
-    private void writeFileField(OutputStream os, String boundary, String fieldName, String filename, byte[] content) throws IOException {
+    private void writeFileField(OutputStream os, String boundary, String fieldName, String filename, byte[] content)
+            throws IOException {
         os.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
         os.write(("Content-Disposition: form-data; name=\"" + fieldName + "\"; filename=\"" + filename + "\"\r\n")
                 .getBytes(StandardCharsets.UTF_8));
@@ -208,4 +220,3 @@ public final class CloudinaryClient {
         }
     }
 }
-

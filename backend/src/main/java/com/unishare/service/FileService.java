@@ -1,23 +1,22 @@
 package com.unishare.service;
 
-import com.unishare.util.CloudinaryClient;
-import com.unishare.model.FileInfo;
 import com.sun.net.httpserver.HttpExchange;
-
+import com.unishare.model.FileInfo;
+import com.unishare.util.CloudinaryClient;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
-import java.nio.charset.StandardCharsets;
 
 /**
- * Service for handling file operations via Cloudinary with metadata stored in the database.
+ * Service for handling file operations via Cloudinary with metadata stored in
+ * the database.
  */
 public class FileService {
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "gif"
-    );
+            "pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "gif");
 
     private final CloudinaryClient cloudinaryClient;
     private final FileMetadataService metadataService;
@@ -28,9 +27,9 @@ public class FileService {
     }
 
     public List<FileInfo> saveUploadedFiles(HttpExchange exchange,
-                                            String module,
-                                            String uploaderEmail,
-                                            byte[] requestBody) throws IOException, SQLException {
+            String module,
+            String uploaderEmail,
+            byte[] requestBody) throws IOException, SQLException {
 
         System.out.println("📤 Received upload request for module: " + module + " by: " + uploaderEmail);
         System.out.println("📊 Request body size: " + requestBody.length + " bytes");
@@ -47,8 +46,7 @@ public class FileService {
             CloudinaryClient.UploadResult uploadResult = cloudinaryClient.uploadRaw(
                     uploadedFile.content,
                     uploadedFile.filename,
-                    "unishare/" + module
-            );
+                    "unishare/" + module);
 
             FileInfo info = metadataService.saveFileMetadata(
                     module,
@@ -56,11 +54,11 @@ public class FileService {
                     uploadedFile.filename,
                     uploadResult.publicId(),
                     uploadResult.secureUrl(),
-                    uploadResult.bytes()
-            );
+                    uploadResult.bytes());
 
             results.add(info);
-            System.out.println("✅ Uploaded to Cloudinary: " + uploadedFile.filename + " -> " + uploadResult.secureUrl());
+            System.out
+                    .println("✅ Uploaded to Cloudinary: " + uploadedFile.filename + " -> " + uploadResult.secureUrl());
         }
 
         return results;
@@ -84,6 +82,10 @@ public class FileService {
 
         metadataService.deleteById(fileId);
         System.out.println("🗑️ File metadata removed for " + fileInfo.getFilename());
+    }
+
+    public Optional<FileInfo> findById(UUID id) throws SQLException {
+        return metadataService.findById(id);
     }
 
     public List<String> getAvailableModules() {
