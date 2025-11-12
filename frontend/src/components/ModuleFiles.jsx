@@ -16,6 +16,7 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [downloadingId, setDownloadingId] = useState(null);
 
   useEffect(() => {
     if (!module) return;
@@ -91,6 +92,28 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
   }, [files, search]);
 
   if (!module) return null;
+
+  const handleDownload = async (file) => {
+    if (!file?.id) {
+      toast.error("Download unavailable: missing file identifier");
+      return;
+    }
+
+    setDownloadingId(file.id);
+    try {
+      const { data } = await api.post(`/api/files/${file.id}/download`);
+      if (data?.downloadUrl) {
+        window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("Failed to prepare download link");
+      }
+    } catch (e) {
+      console.error("Download failed", e);
+      toast.error("Download failed. Please try again.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -193,16 +216,14 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
                       <Eye size={16} />
                     </button>
                     {f.secureUrl && (
-                      <a
-                        href={f.secureUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        className="text-green-600 hover:text-green-800 p-1"
+                      <button
+                        onClick={() => handleDownload(f)}
+                        className="text-green-600 hover:text-green-800 p-1 disabled:opacity-60 disabled:cursor-not-allowed"
                         title="Download"
+                        disabled={downloadingId === f.id}
                       >
-                        <Download size={16} />
-                      </a>
+                        <Download size={16} className={downloadingId === f.id ? "animate-pulse" : ""} />
+                      </button>
                     )}
                     {/* Only show delete button if current user uploaded this file */}
                     {user && f.uploaderName === user.email && (
