@@ -33,7 +33,7 @@ public final class SchemaInitializer {
                             "remote_ip VARCHAR(64)" +
                             ")");
 
-            // Create modules table
+            // Create modules table early for foreign key references
             statement.execute(
                     "CREATE TABLE IF NOT EXISTS modules (" +
                             "code VARCHAR(100) PRIMARY KEY," +
@@ -42,6 +42,40 @@ public final class SchemaInitializer {
                             "created_at TIMESTAMPTZ DEFAULT NOW()" +
                             ")");
 
+
+            statement.execute(
+                    "CREATE TABLE IF NOT EXISTS files (" +
+                            "id uuid PRIMARY KEY," +
+                            "module VARCHAR(100) NOT NULL," +
+                            "uploader_email VARCHAR(255) NOT NULL," +
+                            "filename VARCHAR(255) NOT NULL," +
+                            "storage_key VARCHAR(255) NOT NULL," +
+                            "secure_url TEXT NOT NULL," +
+                            "size_bytes BIGINT NOT NULL," +
+                            "uploaded_at TIMESTAMPTZ DEFAULT NOW()" +
+                            ")");
+
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS files_module_idx ON files (module)");
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS files_uploaded_at_idx ON files (uploaded_at)");
+
+            statement.execute(
+                    "CREATE TABLE IF NOT EXISTS file_download_events (" +
+                            "id BIGSERIAL PRIMARY KEY," +
+                            "file_id uuid NOT NULL REFERENCES files(id) ON DELETE CASCADE," +
+                            "user_id uuid REFERENCES users(id) ON DELETE SET NULL," +
+                            "module_code VARCHAR(100) REFERENCES modules(code) ON DELETE SET NULL," +
+                            "downloaded_at TIMESTAMPTZ DEFAULT NOW()" +
+                            ")");
+
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS file_download_events_file_idx ON file_download_events (file_id)");
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS file_download_events_module_idx ON file_download_events (module_code)");
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS file_download_events_downloaded_at_idx ON file_download_events (downloaded_at)");
+=======
             // Create files table
             statement.execute(
                     "CREATE TABLE IF NOT EXISTS files (" +
@@ -58,6 +92,7 @@ public final class SchemaInitializer {
             // Helpful indexes for faster module/file lookups
             statement.execute("CREATE INDEX IF NOT EXISTS files_module_idx ON files (module)");
             statement.execute("CREATE INDEX IF NOT EXISTS files_module_uploaded_idx ON files (module, uploaded_at DESC)");
+
 
             // Seed initial modules if table is empty
             seedModules(connection);

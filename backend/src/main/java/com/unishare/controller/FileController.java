@@ -7,6 +7,7 @@ import com.unishare.model.User;
 import com.unishare.service.AuthService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
+import com.unishare.service.MonitoringService;
 import com.unishare.service.NotificationService;
 import com.unishare.util.CORSFilter;
 import java.io.*;
@@ -26,13 +27,16 @@ public class FileController implements HttpHandler {
     private final AuthService authService;
     private final NotificationService notificationService;
     private final ModuleService moduleService;
+    private final MonitoringService monitoringService;
 
     public FileController(FileService fileService, AuthService authService,
-            NotificationService notificationService, ModuleService moduleService) {
+            NotificationService notificationService, ModuleService moduleService,
+            MonitoringService monitoringService) {
         this.fileService = fileService;
         this.authService = authService;
         this.notificationService = notificationService;
         this.moduleService = moduleService;
+        this.monitoringService = monitoringService;
     }
 
     @Override
@@ -45,6 +49,10 @@ public class FileController implements HttpHandler {
                 case "POST":
                     if (path.equals("/api/upload")) {
                         handleUpload(exchange);
+                    } else if (path.startsWith("/api/files/") && path.endsWith("/download")) {
+                        handleDownload(exchange);
+                    } else {
+                        sendErrorResponse(exchange, 404, "Not Found");
                     }
                     break;
                 // No GET routes here for now (preview handled client-side via Cloudinary
@@ -154,6 +162,72 @@ public class FileController implements HttpHandler {
             System.err.println("❌ Upload failed: " + e.getMessage());
             e.printStackTrace();
             sendErrorResponse(exchange, 500, "Upload failed: " + e.getMessage());
+        }
+    }
+
+    private void handleDownload(HttpExchange exchange) throws IOException {
+        try {
+            Optional<User> user = authService.findBySessionToken(extractToken(exchange));
+            if (user.isEmpty()) {
+                sendErrorResponse(exchange, 401, "Authentication required");
+                return;
+            }
+
+            String path = exchange.getRequestURI().getPath();
+            final String prefix = "/api/files/";
+            final String suffix = "/download";
+
+            if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+                sendErrorResponse(exchange, 404, "Not Found");
+                return;
+            }
+
+            String idPart = path.substring(prefix.length(), path.length() - suffix.length());
+            if (idPart.isBlank()) {
+                sendErrorResponse(exchange, 400, "Missing file id");
+                return;
+            }
+
+            java.util.UUID fileId;
+            try {
+                fileId = java.util.UUID.fromString(idPart);
+            } catch (IllegalArgumentException ex) {
+                sendErrorResponse(exchange, 400, "Invalid file id");
+                return;
+            }
+
+            Optional<FileInfo> fileInfoOptional = fileService.findById(fileId);
+            if (fileInfoOptional.isEmpty()) {
+                sendErrorResponse(exchange, 404, "File not found");
+                return;
+            }
+
+            FileInfo fileInfo = fileInfoOptional.get();
+
+            if (monitoringService != null) {
+                try {
+                    monitoringService.recordFileDownload(fileInfo.getId(), user.get().getId(), fileInfo.getModule());
+                } catch (Exception e) {
+                    System.err.println("⚠️ Failed to record download event: " + e.getMessage());
+                }
+            }
+
+            String response = "{\"success\":true," +
+                    "\"downloadUrl\":\"" + escapeJson(fileInfo.getSecureUrl()) + "\"," +
+                    "\"filename\":\"" + escapeJson(fileInfo.getFilename()) + "\"," +
+                    "\"module\":\"" + escapeJson(fileInfo.getModule()) + "\"," +
+                    "\"fileSize\":" + fileInfo.getFileSize() +
+                    "}";
+
+            CORSFilter.addCORSHeaders(exchange);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.getResponseBody().close();
+        } catch (Exception e) {
+            System.err.println("❌ Download request failed: " + e.getMessage());
+            sendErrorResponse(exchange, 500, "Failed to prepare download");
         }
     }
 
@@ -305,5 +379,15 @@ public class FileController implements HttpHandler {
         exchange.sendResponseHeaders(code, response.getBytes().length);
         exchange.getResponseBody().write(response.getBytes());
         exchange.getResponseBody().close();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 }
