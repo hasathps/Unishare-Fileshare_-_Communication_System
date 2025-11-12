@@ -25,14 +25,22 @@ public class ModuleService {
         List<ModuleInfo> modules = new ArrayList<>();
         try (Connection conn = databaseService.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(
-                        "SELECT code, name, description FROM modules ORDER BY name ASC");
+                        "SELECT m.code, m.name, m.description, COALESCE(fc.file_count, 0) AS file_count " +
+                                "FROM modules m " +
+                                "LEFT JOIN (" +
+                                "    SELECT module, COUNT(*) AS file_count " +
+                                "    FROM files " +
+                                "    GROUP BY module" +
+                                ") fc ON fc.module = m.code " +
+                                "ORDER BY m.name ASC");
                 ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
                 String code = rs.getString("code");
                 String name = rs.getString("name");
                 String description = rs.getString("description");
-                modules.add(new ModuleInfo(code, name, description));
+                int fileCount = rs.getInt("file_count");
+                modules.add(new ModuleInfo(code, name, description, fileCount));
             }
         } catch (SQLException e) {
             System.err.println("Failed to fetch modules: " + e.getMessage());
@@ -46,14 +54,22 @@ public class ModuleService {
 
         try (Connection conn = databaseService.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(
-                        "SELECT code, name, description FROM modules WHERE code = ?")) {
+                        "SELECT m.code, m.name, m.description, COALESCE(fc.file_count, 0) AS file_count " +
+                                "FROM modules m " +
+                                "LEFT JOIN (" +
+                                "    SELECT module, COUNT(*) AS file_count " +
+                                "    FROM files " +
+                                "    GROUP BY module" +
+                                ") fc ON fc.module = m.code " +
+                                "WHERE m.code = ?")) {
             stmt.setString(1, code);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return new ModuleInfo(
                             rs.getString("code"),
                             rs.getString("name"),
-                            rs.getString("description"));
+                            rs.getString("description"),
+                            rs.getInt("file_count"));
                 }
             }
         } catch (SQLException e) {
