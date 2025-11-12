@@ -9,6 +9,7 @@ const Home = ({ onSelectModule }) => {
   const [modules, setModules] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
 
   useEffect(() => {
@@ -22,9 +23,11 @@ const Home = ({ onSelectModule }) => {
         });
         if (data && Array.isArray(data.modules)) {
           setModules(data.modules);
+          setError(null);
         } else {
           console.warn("Unexpected modules response format:", data);
           setModules([]);
+          setError("Unexpected modules response format.");
         }
       } catch (e) {
         // Don't show error if request was cancelled (e.g., component unmounted)
@@ -34,6 +37,7 @@ const Home = ({ onSelectModule }) => {
             toast.error("Failed to load modules");
           }
           setModules([]);
+          setError("Unable to retrieve modules. Please try again.");
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -124,6 +128,8 @@ const Home = ({ onSelectModule }) => {
       </div>
       {loading ? (
         <div className="text-center text-gray-600">Loading modules...</div>
+      ) : error ? (
+        <div className="text-center text-red-600">{error}</div>
       ) : (
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((mod) => (
