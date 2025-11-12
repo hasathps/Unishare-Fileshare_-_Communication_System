@@ -1,13 +1,31 @@
-import React from 'react'
-import { FileText, Download, Eye, Trash2 } from 'lucide-react'
+import React from "react";
+import { FileText, Download, Trash2 } from "lucide-react";
 
 const FilesSection = () => {
   // Mock data for demonstration
   const files = [
-    { name: 'Sample Document.pdf', module: 'IN3111', uploader: 'John Doe', date: '2025-01-25', size: '2.3 MB' },
-    { name: 'Lecture Notes.docx', module: 'CS101', uploader: 'Jane Smith', date: '2025-01-24', size: '1.8 MB' },
-    { name: 'Assignment.pdf', module: 'MATH201', uploader: 'Mike Johnson', date: '2025-01-23', size: '3.1 MB' }
-  ]
+    {
+      name: "Sample Document.pdf",
+      module: "IN3111",
+      uploader: "John Doe",
+      date: "2025-01-25",
+      size: "2.3 MB",
+    },
+    {
+      name: "Lecture Notes.docx",
+      module: "CS101",
+      uploader: "Jane Smith",
+      date: "2025-01-24",
+      size: "1.8 MB",
+    },
+    {
+      name: "Assignment.pdf",
+      module: "MATH201",
+      uploader: "Mike Johnson",
+      date: "2025-01-23",
+      size: "3.1 MB",
+    },
+  ];
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -17,7 +35,9 @@ const FilesSection = () => {
             <FileText className="mr-2 text-blue-600" size={24} />
             Files Library
           </h2>
-          <p className="text-gray-600 mt-2">Browse and download shared study materials</p>
+          <p className="text-gray-600 mt-2">
+            Browse and download shared study materials
+          </p>
         </div>
 
         <div className="p-6">
@@ -43,12 +63,24 @@ const FilesSection = () => {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Module</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploader</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    File Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Module
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Uploader
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Size
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -57,7 +89,9 @@ const FilesSection = () => {
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <FileText className="mr-2 text-blue-600" size={16} />
-                        <span className="text-sm font-medium text-gray-900">{file.name}</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {file.name}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -65,13 +99,20 @@ const FilesSection = () => {
                         {file.module}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{file.uploader}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{file.date}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{file.size}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {file.uploader}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {file.date}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {file.size}
+                    </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900 p-1">
-                          <Eye size={16} />
+                        {/* Preview removed per request */}
+                        <button className="text-green-600 hover:text-green-900 p-1">
+                          <Download size={16} />
                         </button>
                         <button className="text-green-600 hover:text-green-900 p-1">
                           <Download size={16} />
@@ -89,7 +130,7 @@ const FilesSection = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default FilesSection
+export default FilesSection;
