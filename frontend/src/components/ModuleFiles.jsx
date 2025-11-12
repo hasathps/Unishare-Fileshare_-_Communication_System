@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   UploadCloud,
   FileText,
+  Eye,
   Download,
   Trash2,
 } from "lucide-react";
@@ -178,7 +179,19 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm">
                   <div className="flex items-center space-x-2">
-                    {/* Preview removed per request */}
+                    <button
+                      onClick={() => {
+                        if (f.secureUrl) {
+                          window.open(f.secureUrl, "_blank");
+                        } else {
+                          toast.error("Preview URL not available");
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 p-1"
+                      title="Preview"
+                    >
+                      <Eye size={16} />
+                    </button>
                     {f.secureUrl && (
                       <a
                         href={f.secureUrl}
