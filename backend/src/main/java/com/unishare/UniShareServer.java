@@ -4,16 +4,23 @@ import com.sun.net.httpserver.HttpServer;
 import com.unishare.controller.AuthController;
 import com.unishare.controller.FileController;
 import com.unishare.controller.ModuleController;
+import com.unishare.controller.ModuleSubscriptionController;
+import com.unishare.controller.MonitorController;
+import com.unishare.controller.NotificationController;
 import com.unishare.service.AuthService;
 import com.unishare.service.DatabaseService;
 import com.unishare.service.FileMetadataService;
 import com.unishare.service.FileService;
 import com.unishare.service.ModuleService;
 import com.unishare.service.DownloadManager;
+import com.unishare.service.ModuleSubscriptionService;
+import com.unishare.service.MonitoringService;
+import com.unishare.service.NotificationService;
 import com.unishare.service.SchemaInitializer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 
 /**
@@ -55,14 +62,25 @@ public class UniShareServer {
         // Create services
         FileMetadataService fileMetadataService = new FileMetadataService(databaseService);
         FileService fileService = new FileService(fileMetadataService);
-        ModuleService moduleService = new ModuleService();
+        ModuleService moduleService = new ModuleService(databaseService);
+        ModuleSubscriptionService subscriptionService = new ModuleSubscriptionService(databaseService);
+        NotificationService notificationService = new NotificationService(subscriptionService);
         AuthService authService = new AuthService(databaseService);
         DownloadManager downloadManager = new DownloadManager(fileMetadataService);
 
         // Create controllers
         FileController fileController = new FileController(fileService, authService, downloadManager);
+        MonitoringService monitoringService = new MonitoringService(databaseService, Instant.now());
+
+        // Create controllers
+        FileController fileController = new FileController(fileService, authService, notificationService,
+                moduleService, monitoringService);
         ModuleController moduleController = new ModuleController(moduleService, fileService);
+        ModuleSubscriptionController subscriptionController = new ModuleSubscriptionController(subscriptionService,
+                moduleService, authService);
+        NotificationController notificationController = new NotificationController(notificationService, authService);
         AuthController authController = new AuthController(authService);
+        MonitorController monitorController = new MonitorController(monitoringService);
 
         // Register routes
         server.createContext("/api/upload", fileController);
@@ -73,10 +91,13 @@ public class UniShareServer {
         server.createContext("/api/download-stats", fileController);
         server.createContext("/api/download-cancel", fileController);
         server.createContext("/api/modules", moduleController);
+        server.createContext("/api/subscriptions", subscriptionController);
+        server.createContext("/api/notifications", notificationController);
         server.createContext("/api/auth/login", authController);
         server.createContext("/api/auth/logout", authController);
         server.createContext("/api/auth/register", authController);
         server.createContext("/api/auth/me", authController);
+        server.createContext("/api/monitor", monitorController);
 
         // Set thread pool
         server.setExecutor(Executors.newFixedThreadPool(10));

@@ -10,9 +10,14 @@ public class ModuleInfo {
     private int fileCount;
 
     public ModuleInfo(String code, String name, String description) {
+        this(code, name, description, 0);
+    }
+
+    public ModuleInfo(String code, String name, String description, int fileCount) {
         this.code = code;
         this.name = name;
         this.description = description;
+        this.fileCount = Math.max(fileCount, 0);
     }
 
     public String getCode() {
@@ -32,6 +37,6 @@ public class ModuleInfo {
     }
 
     public void setFileCount(int fileCount) {
-        this.fileCount = fileCount;
+        this.fileCount = Math.max(fileCount, 0);
     }
 }

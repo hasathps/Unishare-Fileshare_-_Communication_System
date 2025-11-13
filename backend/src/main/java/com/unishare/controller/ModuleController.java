@@ -57,18 +57,6 @@ public class ModuleController implements HttpHandler {
         try {
             List<ModuleInfo> modules = moduleService.getModules();
 
-            // Optional enrichment with file counts if fileService present
-            if (fileService != null) {
-                for (ModuleInfo info : modules) {
-                    try {
-                        List<FileInfo> files = fileService.getFilesForModule(info.getCode());
-                        info.setFileCount(files.size());
-                    } catch (Exception e) {
-                        // Non-fatal; leave count at zero
-                    }
-                }
-            }
-
             StringBuilder json = new StringBuilder("{\"modules\":[");
             for (int i = 0; i < modules.size(); i++) {
                 ModuleInfo m = modules.get(i);
@@ -85,7 +73,11 @@ public class ModuleController implements HttpHandler {
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get modules: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get modules");
@@ -122,7 +114,11 @@ public class ModuleController implements HttpHandler {
             CORSFilter.addCORSHeaders(exchange);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
+            try {
+                exchange.getResponseBody().write(bytes);
+            } finally {
+                exchange.getResponseBody().close();
+            }
         } catch (Exception e) {
             System.err.println("❌ Failed to get module files: " + e.getMessage());
             sendErrorResponse(exchange, 500, "Failed to get module files");
@@ -139,8 +135,43 @@ public class ModuleController implements HttpHandler {
     }
 
     private String escape(String s) {
-        if (s == null)
+        if (s == null) {
             return "";
-        return s.replace("\"", "\\\"");
+        }
+
+        StringBuilder escaped = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+            }
+        }
+        return escaped.toString();
     }
 }

@@ -15,17 +15,15 @@ function App() {
   const [refreshTick, setRefreshTick] = useState(0);
   const { user, loading } = useAuth();
 
+  const handleModuleSelect = (mod) => {
+    setSelectedModule(mod);
+    setActiveTab("module");
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case "home":
-        return (
-          <Home
-            onSelectModule={(mod) => {
-              setSelectedModule(mod);
-              setActiveTab("module");
-            }}
-          />
-        );
+        return <Home onSelectModule={handleModuleSelect} />;
       case "module":
         return (
           <ModuleFiles
@@ -106,7 +104,11 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Modern Navbar */}
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onModuleSelect={handleModuleSelect}
+      />
 
       {/* Main Content */}
       <main className="py-8">{renderContent()}</main>
