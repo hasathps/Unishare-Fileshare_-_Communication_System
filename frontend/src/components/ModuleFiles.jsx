@@ -10,12 +10,15 @@ import {
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { downloadService } from "../services/downloadService";
+import DownloadManager from "./DownloadManager";
 
 const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
   const { user } = useAuth();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
 
   useEffect(() => {
@@ -82,6 +85,78 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
     }
   };
 
+  const handleDownload = async (file) => {
+    if (!file?.id) {
+      toast.error("Download unavailable: missing file identifier");
+      return;
+    }
+
+    setDownloadingId(file.id);
+    try {
+      const sessionId = await downloadService.download(file.id, file.filename ?? "download");
+
+      toast.success(`Download started: ${file.filename}`);
+      setDownloadManagerOpen(true);
+
+      const listener = (status) => {
+        if (status.status === "completed") {
+          toast.success(`Download completed: ${file.filename}`);
+          downloadService.removeProgressListener(sessionId, listener);
+          setDownloadingId((current) => (current === file.id ? null : current));
+        } else if (status.status === "failed") {
+          toast.error(
+            `Download failed: ${file.filename} - ${status.error || "Unknown error"}`
+          );
+          downloadService.removeProgressListener(sessionId, listener);
+          setDownloadingId((current) => (current === file.id ? null : current));
+        } else if (status.status === "cancelled") {
+          toast("Download cancelled");
+          downloadService.removeProgressListener(sessionId, listener);
+          setDownloadingId((current) => (current === file.id ? null : current));
+        }
+      };
+
+      downloadService.addProgressListener(sessionId, listener);
+    } catch (error) {
+      console.error("Download failed:", error);
+
+      const message = typeof error?.message === "string" ? error.message.toLowerCase() : "";
+      const isNotFound =
+        error?.response?.status === 404 ||
+        message.includes("404") ||
+        message.includes("not found");
+
+      if (isNotFound) {
+        try {
+          const { data } = await api.get(`/api/files/${file.id}/download`);
+          if (data?.downloadUrl) {
+            window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+            toast.success(`Download ready: ${file.filename}`);
+            setDownloadingId((current) => (current === file.id ? null : current));
+            return;
+          }
+
+          toast.error("Failed to prepare download link");
+        } catch (fallbackError) {
+          console.error("Fallback download failed:", fallbackError);
+          toast.error(
+            `Download failed: ${
+              fallbackError?.response?.data?.error ||
+              fallbackError?.message ||
+              "Unknown error"
+            }`
+          );
+        } finally {
+          setDownloadingId((current) => (current === file.id ? null : current));
+        }
+        return;
+      }
+
+      toast.error(`Download failed: ${error.message || "Unknown error"}`);
+      setDownloadingId((current) => (current === file.id ? null : current));
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return files.filter(
@@ -92,28 +167,6 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
   }, [files, search]);
 
   if (!module) return null;
-
-  const handleDownload = async (file) => {
-    if (!file?.id) {
-      toast.error("Download unavailable: missing file identifier");
-      return;
-    }
-
-    setDownloadingId(file.id);
-    try {
-      const { data } = await api.post(`/api/files/${file.id}/download`);
-      if (data?.downloadUrl) {
-        window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
-      } else {
-        toast.error("Failed to prepare download link");
-      }
-    } catch (e) {
-      console.error("Download failed", e);
-      toast.error("Download failed. Please try again.");
-    } finally {
-      setDownloadingId(null);
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -146,6 +199,12 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
         >
           <UploadCloud size={18} className="mr-2" /> Upload Files
         </button>
+          <button
+            onClick={() => setDownloadManagerOpen(true)}
+            className="px-5 py-2 rounded-lg bg-green-600 text-white font-medium flex items-center hover:bg-green-700 shadow"
+          >
+            <Download size={18} className="mr-2" /> Downloads
+          </button>
       </div>
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -215,16 +274,19 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
                     >
                       <Eye size={16} />
                     </button>
-                    {f.secureUrl && (
-                      <button
-                        onClick={() => handleDownload(f)}
-                        className="text-green-600 hover:text-green-800 p-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                        title="Download"
-                        disabled={downloadingId === f.id}
-                      >
-                        <Download size={16} className={downloadingId === f.id ? "animate-pulse" : ""} />
-                      </button>
-                    )}
+                    
+                    {/*Download Button */}
+                    <button
+                      onClick={() => handleDownload(f)}
+                      className="text-green-600 hover:text-green-800 p-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="Download"
+                      disabled={downloadingId === f.id}
+                    >
+                      <Download
+                        size={16}
+                        className={downloadingId === f.id ? "animate-pulse" : ""}
+                      />
+                    </button>
                     {/* Only show delete button if current user uploaded this file */}
                     {user && f.uploaderName === user.email && (
                       <button
@@ -242,6 +304,12 @@ const ModuleFiles = ({ module, onUploadClick, onBack, refreshKey }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Download Manager Modal */}
+      <DownloadManager
+        isOpen={downloadManagerOpen}
+        onClose={() => setDownloadManagerOpen(false)}
+      />
     </div>
   );
 };
