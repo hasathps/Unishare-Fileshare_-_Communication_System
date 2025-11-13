@@ -1,4 +1,6 @@
 // Download service for managing concurrent downloads
+import { API_BASE_URL } from "./api";
+
 class DownloadService {
   constructor() {
     this.activeDownloads = new Map();
@@ -12,7 +14,7 @@ class DownloadService {
     try {
       console.log(`📥 Starting file download: ${filename}`);
       
-      const response = await fetch(`/api/download/${fileId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/download/${fileId}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -54,7 +56,7 @@ class DownloadService {
   async monitorProgress(sessionId) {
     const monitor = async () => {
       try {
-        const response = await fetch(`/api/download-status/${sessionId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/download-status/${sessionId}`, {
           credentials: 'include'
         });
 
@@ -108,7 +110,7 @@ class DownloadService {
       }
 
       // Get the file content from the download session
-      const response = await fetch(`/api/download-file/${sessionId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/download-file/${sessionId}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/octet-stream'
@@ -144,7 +146,7 @@ class DownloadService {
    */
   async cancelDownload(sessionId) {
     try {
-      const response = await fetch(`/api/download-cancel/${sessionId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/download-cancel/${sessionId}`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -172,7 +174,7 @@ class DownloadService {
    */
   async getStatistics() {
     try {
-      const response = await fetch('/api/download-stats', {
+      const response = await fetch(`${API_BASE_URL}/api/download-stats`, {
         credentials: 'include'
       });
 

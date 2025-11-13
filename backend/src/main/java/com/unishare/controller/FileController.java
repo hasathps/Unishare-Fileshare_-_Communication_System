@@ -28,20 +28,23 @@ public class FileController implements HttpHandler {
     private final FileService fileService;
     private final AuthService authService;
     private final DownloadManager downloadManager;
-
-    public FileController(FileService fileService, AuthService authService, DownloadManager downloadManager) {
-        this.fileService = fileService;
-        this.authService = authService;
-        this.downloadManager = downloadManager;
     private final NotificationService notificationService;
     private final ModuleService moduleService;
     private final MonitoringService monitoringService;
 
-    public FileController(FileService fileService, AuthService authService,
-            NotificationService notificationService, ModuleService moduleService,
+    public FileController(FileService fileService, AuthService authService, DownloadManager downloadManager) {
+        this(fileService, authService, downloadManager, null, null, null);
+    }
+
+    public FileController(FileService fileService,
+            AuthService authService,
+            DownloadManager downloadManager,
+            NotificationService notificationService,
+            ModuleService moduleService,
             MonitoringService monitoringService) {
         this.fileService = fileService;
         this.authService = authService;
+        this.downloadManager = downloadManager;
         this.notificationService = notificationService;
         this.moduleService = moduleService;
         this.monitoringService = monitoringService;
@@ -71,7 +74,7 @@ public class FileController implements HttpHandler {
                     } else if (path.equals("/api/download-stats")) {
                         handleDownloadStats(exchange);
                     } else if (path.startsWith("/api/files/") && path.endsWith("/download")) {
-                        handleDownload(exchange);
+                        handleFileDownloadLink(exchange);
                     } else {
                         sendErrorResponse(exchange, 404, "Not Found");
                     }
@@ -143,17 +146,30 @@ public class FileController implements HttpHandler {
             List<FileInfo> uploadedFiles = fileService.saveUploadedFiles(exchange, module, uploaderEmail, requestBody);
 
             // Notify subscribers about the file upload
-            if (!uploadedFiles.isEmpty()) {
-                com.unishare.model.ModuleInfo moduleInfo = moduleService.findByCode(module);
-                String moduleName = (moduleInfo != null) ? moduleInfo.getName() : module;
+            if (!uploadedFiles.isEmpty() && notificationService != null) {
+                String moduleName = module;
+                if (moduleService != null) {
+                    try {
+                        com.unishare.model.ModuleInfo moduleInfo = moduleService.findByCode(module);
+                        if (moduleInfo != null && moduleInfo.getName() != null) {
+                            moduleName = moduleInfo.getName();
+                        }
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Failed to load module name: " + e.getMessage());
+                    }
+                }
 
                 for (FileInfo file : uploadedFiles) {
-                    notificationService.notifyFileUpload(
-                            module,
-                            moduleName,
-                            file.getFilename(),
-                            uploaderLabel,
-                            user.get().getId());
+                    try {
+                        notificationService.notifyFileUpload(
+                                module,
+                                moduleName,
+                                file.getFilename(),
+                                uploaderLabel,
+                                user.get().getId());
+                    } catch (Exception notifyError) {
+                        System.err.println("⚠️ Failed to notify subscribers: " + notifyError.getMessage());
+                    }
                 }
             }
 
@@ -184,7 +200,11 @@ public class FileController implements HttpHandler {
         }
     }
 
-    private void handleDownload(HttpExchange exchange) throws IOException {
+    /**
+     * Handle direct download link requests (legacy flow)
+     * URL pattern: /api/files/{fileId}/download
+     */
+    private void handleFileDownloadLink(HttpExchange exchange) throws IOException {
         try {
             Optional<User> user = authService.findBySessionToken(extractToken(exchange));
             if (user.isEmpty()) {
@@ -245,8 +265,8 @@ public class FileController implements HttpHandler {
             exchange.getResponseBody().write(bytes);
             exchange.getResponseBody().close();
         } catch (Exception e) {
-            System.err.println("❌ Download request failed: " + e.getMessage());
-            sendErrorResponse(exchange, 500, "Failed to prepare download");
+            System.err.println("❌ Direct download link failed: " + e.getMessage());
+            sendErrorResponse(exchange, 500, "Failed to prepare download link");
         }
     }
 
@@ -394,8 +414,17 @@ public class FileController implements HttpHandler {
      * Handle file download requests through the download manager
      * URL pattern: /api/download/{fileId}
      */
+    /**
+     * Handle download requests through the download manager
+     * URL pattern: /api/download/{fileId}
+     */
     private void handleDownload(HttpExchange exchange) throws IOException {
         try {
+            if (downloadManager == null) {
+                sendErrorResponse(exchange, 503, "Download manager unavailable");
+                return;
+            }
+
             Optional<User> user = authService.findBySessionToken(extractToken(exchange));
             if (user.isEmpty()) {
                 sendErrorResponse(exchange, 401, "Authentication required");
@@ -448,6 +477,11 @@ public class FileController implements HttpHandler {
      */
     private void handleDownloadStatus(HttpExchange exchange) throws IOException {
         try {
+            if (downloadManager == null) {
+                sendErrorResponse(exchange, 503, "Download manager unavailable");
+                return;
+            }
+
             String path = exchange.getRequestURI().getPath();
             String sessionId = path.substring("/api/download-status/".length());
             
@@ -489,6 +523,11 @@ public class FileController implements HttpHandler {
      */
     private void handleDownloadStats(HttpExchange exchange) throws IOException {
         try {
+            if (downloadManager == null) {
+                sendErrorResponse(exchange, 503, "Download manager unavailable");
+                return;
+            }
+
             DownloadManager.DownloadStats stats = downloadManager.getStatistics();
             String response = stats.toJson();
             
@@ -510,6 +549,11 @@ public class FileController implements HttpHandler {
      */
     private void handleDownloadFile(HttpExchange exchange) throws IOException {
         try {
+            if (downloadManager == null) {
+                sendErrorResponse(exchange, 503, "Download manager unavailable");
+                return;
+            }
+
             Optional<User> user = authService.findBySessionToken(extractToken(exchange));
             if (user.isEmpty()) {
                 sendErrorResponse(exchange, 401, "Authentication required");
@@ -556,6 +600,10 @@ public class FileController implements HttpHandler {
             exchange.sendResponseHeaders(200, fileContent.length);
             try (OutputStream outputStream = exchange.getResponseBody()) {
                 outputStream.write(fileContent);
+            }
+            
+            if (downloadManager != null) {
+                downloadManager.clearSession(sessionId);
             }
             
             System.out.println("✅ File served: " + fileInfo.getFilename() + " (" + fileContent.length + " bytes)");
@@ -610,6 +658,11 @@ public class FileController implements HttpHandler {
      */
     private void handleDownloadCancel(HttpExchange exchange) throws IOException {
         try {
+            if (downloadManager == null) {
+                sendErrorResponse(exchange, 503, "Download manager unavailable");
+                return;
+            }
+
             String path = exchange.getRequestURI().getPath();
             String sessionId = path.substring("/api/download-cancel/".length());
             

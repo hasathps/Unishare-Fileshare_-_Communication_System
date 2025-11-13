@@ -67,14 +67,16 @@ public class UniShareServer {
         NotificationService notificationService = new NotificationService(subscriptionService);
         AuthService authService = new AuthService(databaseService);
         DownloadManager downloadManager = new DownloadManager(fileMetadataService);
-
-        // Create controllers
-        FileController fileController = new FileController(fileService, authService, downloadManager);
         MonitoringService monitoringService = new MonitoringService(databaseService, Instant.now());
 
         // Create controllers
-        FileController fileController = new FileController(fileService, authService, notificationService,
-                moduleService, monitoringService);
+        FileController fileController = new FileController(
+                fileService,
+                authService,
+                downloadManager,
+                notificationService,
+                moduleService,
+                monitoringService);
         ModuleController moduleController = new ModuleController(moduleService, fileService);
         ModuleSubscriptionController subscriptionController = new ModuleSubscriptionController(subscriptionService,
                 moduleService, authService);

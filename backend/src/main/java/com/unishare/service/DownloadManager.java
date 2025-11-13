@@ -138,11 +138,12 @@ public class DownloadManager {
     }
     
     private void processDownload(DownloadRequest request) {
+        DownloadSession session = null;
         try {
             // Acquire semaphore permit (blocks if max concurrent limit reached)
             downloadSemaphore.acquire();
             
-            DownloadSession session = new DownloadSession(request.sessionId, DownloadStatus.STARTING);
+            session = new DownloadSession(request.sessionId, DownloadStatus.STARTING);
             activeSessions.put(request.sessionId, session);
             
             try {
@@ -150,7 +151,9 @@ public class DownloadManager {
             } finally {
                 // Always release the permit and clean up
                 downloadSemaphore.release();
-                activeSessions.remove(request.sessionId);
+                if (session.getStatus() == DownloadStatus.CANCELLED || session.getStatus() == DownloadStatus.FAILED) {
+                    activeSessions.remove(request.sessionId);
+                }
             }
             
         } catch (InterruptedException e) {
@@ -289,6 +292,13 @@ public class DownloadManager {
             Thread.currentThread().interrupt();
         }
         System.out.println("✅ DownloadManager shutdown complete");
+    }
+    
+    /**
+     * Remove a download session once the caller has consumed its data.
+     */
+    public void clearSession(String sessionId) {
+        activeSessions.remove(sessionId);
     }
     
     // Inner classes for data structures

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Pause, Play, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Download, X, Clock, AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
 import { downloadService } from '../services/downloadService';
 
 const DownloadManager = ({ isOpen, onClose }) => {
@@ -31,6 +31,15 @@ const DownloadManager = ({ isOpen, onClose }) => {
       await downloadService.cancelDownload(sessionId);
     } catch (error) {
       console.error('Failed to cancel download:', error);
+    }
+  };
+
+  const handleRemove = (sessionId) => {
+    try {
+      downloadService.removeDownload(sessionId);
+      setDownloads(downloadService.getActiveDownloads());
+    } catch (error) {
+      console.error('Failed to remove download:', error);
     }
   };
 
@@ -90,7 +99,7 @@ const DownloadManager = ({ isOpen, onClose }) => {
 
         {/* Stats */}
         <div className="p-4 bg-gray-50 border-b">
-          <div className="grid grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold text-blue-600">{stats.activeDownloads}</div>
               <div className="text-sm text-gray-600">Active</div>
@@ -98,10 +107,6 @@ const DownloadManager = ({ isOpen, onClose }) => {
             <div>
               <div className="text-2xl font-bold text-yellow-600">{stats.queuedDownloads}</div>
               <div className="text-sm text-gray-600">Queued</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-green-600">{stats.availableSlots}</div>
-              <div className="text-sm text-gray-600">Available</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-purple-600">
@@ -142,6 +147,17 @@ const DownloadManager = ({ isOpen, onClose }) => {
                           title="Cancel Download"
                         >
                           <X size={16} />
+                        </button>
+                      )}
+                      {(download.status === 'completed' ||
+                        download.status === 'failed' ||
+                        download.status === 'cancelled') && (
+                        <button
+                          onClick={() => handleRemove(download.sessionId)}
+                          className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                          title="Remove from list"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       )}
                     </div>
